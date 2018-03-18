@@ -4,7 +4,7 @@
 <title>Maze</title>
 <meta charset="UTF-8">
 <style>
-body { margin: 0px; }
+body { margin: 0px; background-color: #000; }
 #container { position: relative; width: 0; height: 0; }
 .cell { position: absolute; background-color: #000; font-size: 8px; text-align: center; }
 .wall { position: absolute; background-color: #000; }
@@ -13,7 +13,7 @@ body { margin: 0px; }
 .end { background-color: #f33!important; }
 .forward { background-color: #ccf!important; }
 .backward { background-color: #fcc!important; }
-.white { background-color: #fff; }
+.white { background-color: #fff; z-index: -1; }
 </style>
 </head>
 <body>
@@ -321,7 +321,7 @@ function showSteps(steps, index)
 		if (obj.classList.contains('empty'))
 			obj.classList.add('white');
 		else 
-			obj.style['display'] = 'none';
+			obj.classList.add('white');
 		index++;
 		
 		if (index >= steps.length)
