@@ -6,7 +6,7 @@
 <style>
 body { margin: 0px; background-color: #000; }
 #container { position: relative; width: 0; height: 0; }
-.cell { position: absolute; background-color: #000; font-size: 8px; text-align: center; color: #fff; }
+.cell { position: absolute; background-color: #000; font-size: 8px; text-align: center; color: #00f; }
 .wall { position: absolute; background-color: #000; }
 .empty { background-color: #000; }
 .start { background-color: #33f!important; color: #fff; }
@@ -14,29 +14,42 @@ body { margin: 0px; background-color: #000; }
 .forward { background-color: #ccf!important; }
 .backward { background-color: #fcc!important; }
 .white { background-color: #fff; z-index: -1; }
+.yellow { background-color: #ee3; }
 </style>
 </head>
 <body>
 <div id="container"></div>
 <script>
+var _speed = 10;						// Animation speed.
+var _show_solution = false;				// Show the solution at the beginning.
+var _show_solution_steps = true;		// Solution animation details.
+var _cell_size = 20;
+var _wall_size = 3;
+
 var _board_col = 100, _board_row = 50;
-var _cell_size = 20, _wall_size = 3;
-var _speed = 10, _showSolution = false;
 var _sx = 0, _sy = 0;
 var _ex = 0, _ey = 0;
+var _count = 0;
 var _board;
 var _container;
 var _solution;
-var _steps;
+var _solution_steps;
+var _maze_steps;
+
+var queue = null;
 
 window.onload = initGame();
 
 function initGame()
 {
 	initBoard();
-	findSolution(_solution, _board, _sx, _sy, 0);
 	
-	showSteps(_steps, 0);
+	if (_count++ % 2 == 0)
+		findSolution(_solution_steps, _solution, _board, _sx, _sy, 0);
+	else 
+		findSolution2(_solution_steps, _solution, _board, _sx, _sy, 0);
+	
+	showSteps(_maze_steps, 0);
 }
 
 function initBoard()
@@ -53,8 +66,9 @@ function initBoard()
 	_container.style['left'] = (window.innerWidth - _board_col * (_cell_size + _wall_size)) / 2 + 'px';
 	_container.style['top'] = (window.innerHeight - _board_row * (_cell_size + _wall_size)) / 2 + 'px';
 	
-	_steps = new Array();
+	_maze_steps = new Array();
 	_board = new Array();
+	_solution_steps = new Array();
 	_solution = new Array();
 	for (var i = 0; i < _board_row; i++)
 	{
@@ -66,7 +80,7 @@ function initBoard()
 	}
 	
 	createBoard(_container, _board, _cell_size, _wall_size);
-	setEmptyCell(_steps, _board, 0, 0, 0);
+	setEmptyCell(_maze_steps, _board, 0, 0, 0);
 }
 
 function setWall(wall, type, i, j, cell_size, wall_size)
@@ -136,12 +150,12 @@ function createBoard(container, board, cell_size, wall_size)
 	}
 }
 
-function setEmptyCell(steps, board, x, y, depth)
+function setEmptyCell(maze_steps, board, x, y, depth)
 {
 	var cell = document.getElementById('cell_' + x + '_' + y);
 	if (cell == null || cell.classList.contains('empty')) return false;
 	
-	_steps.push(cell);
+	maze_steps.push(cell);
 	cell.classList.add('empty');
 	
 	var offsets = [[0, -1], [0, 1], [-1, 0], [1, 0]];
@@ -175,16 +189,15 @@ function setEmptyCell(steps, board, x, y, depth)
 			board[y][x][temp + 2] = 1;
 			board[new_y][new_x][Math.abs(temp - 1) + 2] = 1;
 		}
-		//wall.classList.add('white');
-		_steps.push(wall);
+		maze_steps.push(wall);
 
-		setEmptyCell(steps, board, new_x, new_y, depth + 1);
+		setEmptyCell(maze_steps, board, new_x, new_y, depth + 1);
 	}
 	
 	return true;
 }
 
-function findSolution(solution, board, x, y, depth)
+function findSolution(solution_steps, solution, board, x, y, depth)
 {
 	var cell = document.getElementById('cell_' + x + '_' + y);
 	if (cell == null || !cell.classList.contains('empty')) return false;
@@ -194,57 +207,6 @@ function findSolution(solution, board, x, y, depth)
 	cell.classList.add('found');
 	
 	var offsets = new Array();
-	//*
-	if (solution.length == 0 || solution[solution.length - 1][3][0] == 0)
-	{
-		if (_ex > _sx)
-		{
-			if (board[y][x][3] == 1) offsets.push([1, 0]);
-			if (board[y][x][2] == 1) offsets.push([-1, 0]);
-		}
-		else 
-		{
-			if (board[y][x][2] == 1) offsets.push([-1, 0]);
-			if (board[y][x][3] == 1) offsets.push([1, 0]);
-		}
-		
-		if (_ey > _sy)
-		{
-			if (board[y][x][1] == 1) offsets.push([0, 1]);
-			if (board[y][x][0] == 1) offsets.push([0, -1]);
-		}
-		else 
-		{
-			if (board[y][x][0] == 1) offsets.push([0, -1]);
-			if (board[y][x][1] == 1) offsets.push([0, 1]);
-		}
-	}
-	else
-	{
-		if (_ey > _sy)
-		{
-			if (board[y][x][1] == 1) offsets.push([0, 1]);
-			if (board[y][x][0] == 1) offsets.push([0, -1]);
-		}
-		else 
-		{
-			if (board[y][x][0] == 1) offsets.push([0, -1]);
-			if (board[y][x][1] == 1) offsets.push([0, 1]);
-		}
-		
-		if (_ex > _sx)
-		{
-			if (board[y][x][3] == 1) offsets.push([1, 0]);
-			if (board[y][x][2] == 1) offsets.push([-1, 0]);
-		}
-		else 
-		{
-			if (board[y][x][2] == 1) offsets.push([-1, 0]);
-			if (board[y][x][3] == 1) offsets.push([1, 0]);
-		}
-	}
-	//*/
-	/*
 	if (board[y][x][3] == 1) offsets.push([1, 0]);
 	if (board[y][x][1] == 1) offsets.push([0, 1]);
 	if (board[y][x][0] == 1) offsets.push([0, -1]);
@@ -256,23 +218,95 @@ function findSolution(solution, board, x, y, depth)
 		offsets[i] = offsets[rand];
 		offsets[rand] = temp;
 	}
-	//*/
 	
 	for (var i = 0; i < offsets.length; i++)
 	{
-		if (_showSolution) cell.innerHTML = depth % 1000;
+		if (_show_solution) cell.innerHTML = depth % 1000;
+		solution_steps.push([x, y, 1, offsets[i]]);
 		solution.push([x, y, 1, offsets[i]]);
-	
+		
 		var new_x = x + offsets[i][0];
 		var new_y = y + offsets[i][1];
-		var flag = findSolution(solution, board, new_x, new_y, depth + 1);
+		var flag = findSolution(solution_steps, solution, board, new_x, new_y, depth + 1);
 		if (flag) return flag;
+		solution.pop();
 	}
 	
 	cell.innerHTML = '';
-	solution.push([x, y, 0, [0, 0]]);
+	solution_steps.push([x, y, 0, [0, 0], 0]);
 	
 	return false;
+}
+
+function findSolution2(solution_steps, solution, board, x, y, depth)
+{
+	if (depth == 0) 
+	{
+		queue = new Array();
+		var cell = document.getElementById('cell_' + x + '_' + y);
+		queue.push(cell);
+		solution_steps.push([x, y, 1, [0, 0], -1, -1, 0]);
+		solution.push([x, y, 1, [0, 0], -1, -1, 0]);
+	}
+	
+	while (queue.length > 0)
+	{
+		var cell = queue.shift();
+		x = parseInt(cell.getAttribute('x'));
+		y = parseInt(cell.getAttribute('y'));
+		
+		var offsets = new Array();
+		if (board[y][x][3] == 1) offsets.push([1, 0]);
+		if (board[y][x][1] == 1) offsets.push([0, 1]);
+		if (board[y][x][0] == 1) offsets.push([0, -1]);
+		if (board[y][x][2] == 1) offsets.push([-1, 0]);
+		for (var i = 0; i < offsets.length; i++)
+		{
+			var rand = Math.floor(Math.random() * offsets.length);
+			var temp = offsets[i];
+			offsets[i] = offsets[rand];
+			offsets[rand] = temp;
+		}
+		
+		for (var i = 0; i < offsets.length; i++)
+		{
+			var new_x = x + offsets[i][0];
+			var new_y = y + offsets[i][1];
+			var cell = document.getElementById('cell_' + new_x + '_' + new_y);
+			if (cell.classList.contains('found')) continue;
+			if (cell.classList.contains('start')) continue;
+			if (cell.classList.contains('end'))
+			{
+				while (queue.length > 0) queue.pop();
+				
+				var temp_x = x;
+				var temp_y = y;
+				while (temp_x >= 0 && temp_y >= 0)
+				{
+					for (var j = 0; j < solution.length; j++)
+					{
+						if (solution[j][0] == temp_x && solution[j][1] == temp_y)
+						{
+							temp_i = j;
+							break;
+						}
+					}
+					
+					temp_x = solution[temp_i][4];
+					temp_y = solution[temp_i][5];
+					
+					solution[temp_i][6] = 1;
+					solution_steps[temp_i][6] = 1;
+				}
+				
+				break;
+			}
+			cell.classList.add('found');
+			queue.push(cell);
+			solution_steps.push([new_x, new_y, 1, offsets[i], x, y, 0]);
+			solution.push([new_x, new_y, 1, offsets[i], x, y, 0]);
+		}
+	}
 }
 
 function showSolution(solution, index)
@@ -314,6 +348,28 @@ function showSolution(solution, index)
 		index++;
 		if (index >= solution.length) 
 		{
+			for (var j = 0; j < solution.length; j++)
+			{
+				x = solution[j][0];
+				y = solution[j][1];
+				cell = document.getElementById('cell_' + x + '_' + y);
+				if (cell == null) break;
+				
+				if (solution[0].length >= 6)
+				{
+					if (solution[j][6] == 1)
+					{
+						cell.classList.remove('forward');
+						cell.classList.add('yellow');
+					}
+				}
+				else
+				{
+					cell.classList.remove('forward');
+					cell.classList.add('yellow');
+				}
+			}
+
 			setTimeout('initGame()', 8000);
 			return;
 		}
@@ -321,11 +377,11 @@ function showSolution(solution, index)
 	setTimeout(function () { showSolution(solution, index); }, 50);
 }
 
-function showSteps(steps, index)
+function showSteps(maze_steps, index)
 {
 	for (var i = 0; i < _speed * 10; i++)
 	{
-		var obj = steps[index];
+		var obj = maze_steps[index];
 		if (obj == null) break;
 		
 		if (obj.classList.contains('empty'))
@@ -334,13 +390,19 @@ function showSteps(steps, index)
 			obj.classList.add('white');
 		index++;
 		
-		if (index >= steps.length)
+		if (index >= maze_steps.length)
 		{
-			showSolution(_solution, 0);
+			//*
+			if (_show_solution_steps)
+				showSolution(_solution_steps, 0);
+			else 
+				showSolution(_solution, 0);
+			//*/
+			console.log(_solution_steps);
 			return;
 		}
 	}
-	setTimeout(function () { showSteps(steps, index); }, 4);
+	setTimeout(function () { showSteps(maze_steps, index); }, 4);
 }
 
 </script>
