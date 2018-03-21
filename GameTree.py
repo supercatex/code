@@ -6,7 +6,7 @@ _actions = [1, 3, 7, 8]
 _solution = []
 temp = [None] * 1000
 
-
+
 def f(x, depth):
 
     actions = copy.copy(_actions)
