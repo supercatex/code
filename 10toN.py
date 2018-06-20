@@ -18,7 +18,7 @@ def inputInteger ( message ):
 
 def getMaxPower ( number , base ):
     power = 0
-    n = 1
+    n = 0
     while n <= number:
         power = power + 1
         n = pow ( base , power )
