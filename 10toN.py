@@ -37,7 +37,7 @@ def calc ( number , base ):
             num = num - tmp
             bit = bit - 1
         number = number - num
-        result = result + str ( digit[bit] )
+        result = result + digit[bit]
 
         power = power - 1
 
