@@ -9,8 +9,6 @@ def inputInteger ( message ):
             if str == 'q':
                 exit(0)
             num = int ( str )
-            if num < 0:
-                 continue
             return num
         except Exception as e:
             pass
@@ -27,22 +25,19 @@ def getMaxPower ( number , base ):
 
 def calc ( number , base ):
 
-    power = getMaxPower ( number , base )
     result = ''
+    power = getMaxPower ( number , base )
 
     while power >= 0:
         tmp = pow ( base , power )
         bit = base - 1
         num = tmp * bit
 
-        if number == 0:
-            result = result + digit[0]
-        else:
-            while number - num < 0:
-                num = num - tmp
-                bit = bit - 1
-            number = number - num
-            result = result + str ( digit[bit] )
+        while number - num < 0:
+            num = num - tmp
+            bit = bit - 1
+        number = number - num
+        result = result + str ( digit[bit] )
 
         power = power - 1
 
@@ -51,9 +46,14 @@ def calc ( number , base ):
 
 if __name__ == '__main__':
     while True:
+
         base = inputInteger ( '你要計算幾進制？' )
         if base < 2 or base > 16:
             print ( '不會計這個~' )
             continue
+            
         number = inputInteger ( '數字是？' )
-        print ( calc ( number , base ) )
+        if number >= 0:
+            print ( calc ( number , base ) )
+        else:
+            print ( '-' + calc ( -number , base ) )
