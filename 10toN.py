@@ -1,5 +1,8 @@
 
-digit = [ '0' , '1' , '2' , '3' , '4' , '5' , '6' , '7' , '8' , '9' , 'A' , 'B' , 'C' , 'D' , 'E', 'F' ]
+digit = [ 
+    '0' , '1' , '2' , '3' , '4' , 
+    '5' , '6' , '7' , '8' , '9' , 
+    'A' , 'B' , 'C' , 'D' , 'E', 'F' ]
 
 
 def inputInteger ( message ):
@@ -23,7 +26,7 @@ def getMaxPower ( number , base ):
     return power - 1
 
 
-def calc ( number , base ):
+def method_1 ( number , base ):
 
     result = ''
     power = getMaxPower ( number , base )
@@ -43,12 +46,29 @@ def calc ( number , base ):
 
     return result
 
+def method_2 ( number , base ):
+
+    if number == 0:
+        return '0'
+
+    result = ''
+    n = number
+
+    while n > 0:
+        result = digit[n % base] + result
+        n = n // base
+    
+    return result
+
+
+def calc ( number , base ):
+    return method_1 ( number , base )
+
 
 if __name__ == '__main__':
     while True:
-
         base = inputInteger ( '你要計算幾進制？' )
-        if base < 2 or base > 16:
+        if base < 2 or base > len ( digit ):
             print ( '不會計這個~' )
             continue
             
