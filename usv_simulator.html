@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>USV Simulator</title>
+<meta charset="UTF-8">
+<style>
+#container { width: 600px; position: relative; left: 50%; }
+#messageBox { width: 150px; position: absolute; left: -450px; top: 0px; }
+#canvas  { background-color: #9999FF; position: absolute; left: -300px; top: 0px; }
+</style>
+</head>
+<body>
+<div id="container">
+	<div id="messageBox"></div>
+	<canvas id="canvas" width="600" height="600"></canvas>
+</div>
+<script type="text/javascript">
+
+	var canvas = document.getElementById("canvas");
+	var ctx = canvas.getContext("2d");
+	
+	var _friction = 0.01;
+	var _max_flow_velocity = 1;
+	var _flow_velocity = [0, 0];
+	var _usv = {
+		w: 20,
+		h: 30,
+		x: canvas.width / 2,
+		y: canvas.height / 2,
+		degree: 0,
+		vx: 0,
+		vy: 0,
+		power1: 0,		// Left
+		power2: 0		// Right
+	}
+	var _target = {
+		r: 5,
+		x: 0,
+		y: 0
+	}
+	var _flowing_objects = [];
+	
+	function init() {
+		canvas.addEventListener('click', function(event) {
+			var x = event.offsetX;
+			var y = event.offsetY;
+			_target.x = x;
+			_target.y = y;
+		}, false);
+		
+		randomTarget(_target);
+		for (var i = 0; i < 100; i++) {
+			var obj = {
+				x: Math.random() * canvas.width,
+				y: Math.random() * canvas.height,
+				r: 3
+			}
+			_flowing_objects.push(obj);
+		}
+		window.requestAnimationFrame(draw);
+	}
+	
+	function draw() {
+		ctx.globalCompositeOperation = 'source-over';
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		
+		refreshMessageBox();
+		
+		drawTarget(_target);
+		drawFlowingObjects(_flowing_objects);
+		
+		drawUSV(_usv);
+		updateVelocity(_usv);
+		updatePosition(_usv);
+		
+		unmanned_control(_usv, _target);
+		
+		window.requestAnimationFrame(draw);
+	}
+	
+	function drawFlowingObjects(flowing_objects) {
+		for (var i = 0; i < flowing_objects.length; i++) {
+			var obj = flowing_objects[i];
+			var x = obj.x;
+			var y = obj.y;
+			var r = obj.r;
+			
+			ctx.save();
+			
+			ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+			ctx.translate(x, y);
+			
+			ctx.beginPath();
+			ctx.arc(0, 0, r, 0, 2 * Math.PI);
+			ctx.fill();
+			
+			ctx.restore();
+			
+			obj.x += _flow_velocity[0];
+			obj.y += _flow_velocity[1];
+			
+			if (obj.x < 0) obj.x = canvas.width;
+			if (obj.y < 0) obj.y = canvas.height;
+			if (obj.x > canvas.width) obj.x = 0;
+			if (obj.y > canvas.height) obj.y = 0;
+		}
+	}
+	
+	var Kp = [10, 1], Ki = [0, 0], Kd = [1000, 1];
+	var pre_error = [0, 0];
+	var cur_error = [0, 0];
+	var sum_error = [0, 0];
+	var cur_delta = [0, 0];
+	var task = 0;
+	function unmanned_control(usv, target) {
+		
+		var et = direction(usv, target) - usv.degree;
+		if (et > 180) et -= 360;
+		if (et < -180) et += 360;
+		if (Math.abs(et) < 10) et = 0;
+		
+		var dist = distance(usv, target);
+		if (Math.abs(dist) < 3) dist = 0;
+		if (dist < target.r + 10) {
+			task++;
+			if (task == 500) {
+				sum_error[0] = 0;
+				sum_error[1] = 0;
+				randomTarget(target);
+				return;
+			}
+		} else {
+			task = 0;
+		}
+		if (et > 90 || et < -90) dist = -dist;
+		
+		cur_error[0] = dist;
+		cur_delta[0] = cur_error[0] - pre_error[0];
+		sum_error[0] = sum_error[0] + cur_error[0];
+		var power = Kp[0] * cur_error[0] + Ki[0] * sum_error[0] + Kd[0] * cur_delta[0];
+		power = Math.max(Math.min(power, 100), -100);
+		pre_error[0] = cur_error[0];
+
+		cur_error[1] = et;
+		cur_delta[1] = cur_error[1] - pre_error[1];
+		sum_error[1] = sum_error[1] + cur_error[1];
+
+		var rotate = Kp[1] * cur_error[1] + Ki[1] * sum_error[1] + Kd[1] * cur_delta[1];
+		rotate = Math.max(Math.min(rotate, 100), -100);
+		pre_error[1] = cur_error[1];
+		
+		//console.log(et);
+		if (et == 0 || (Math.abs(et) > 170 && Math.abs(dist) < usv.h) || Math.abs(dist) < target.r) {
+			power1 = power;
+			power2 = power;
+		} else {
+			rotate *= 10;
+			power1 = Math.max(Math.min(rotate, 100), -100);
+			power2 = Math.max(Math.min(-rotate, 100), -100);
+		}
+		
+		usv.power1 = power1;
+		usv.power2 = power2;
+		
+		if (Math.random() < 0.001) {
+			//randomFlowVelocity();
+		}
+	}
+	
+	function direction(p1, p2) {
+		var dx = p2.x - p1.x;
+		var dy = p1.y - p2.y;
+		var radian = Math.atan2(dx, dy);
+		var degree = radian * 180 / Math.PI;
+		return degree;
+	}
+	
+	function distance(p1, p2) {
+		var dx = p2.x - p1.x;
+		var dy = p1.y - p2.y;
+		return Math.sqrt(dx * dx + dy * dy);
+	}
+	
+	function randomTarget(target) {
+		var x = Math.random() * canvas.width;
+		var y = Math.random() * canvas.height;
+		target.x = x;
+		target.y = y;
+		
+		randomFlowVelocity();
+	}
+	
+	function randomFlowVelocity() {
+		var range = _max_flow_velocity;
+		_flow_velocity[0] = Math.random() * range * 2 - range;
+		_flow_velocity[1] = Math.random() * range * 2 - range;
+	}
+	
+	function drawTarget(target) {
+		var x = target.x;
+		var y = target.y;
+		var r = target.r;
+		
+		ctx.save();
+		
+		ctx.fillStyle = 'rgba(155, 0, 0, 1)';
+		ctx.translate(x, y);
+		
+		ctx.beginPath();
+		ctx.arc(0, 0, r, 0, 2 * Math.PI);
+		ctx.fill();
+		
+		ctx.restore();
+	}
+	
+	function refreshMessageBox() {
+		var msg = document.getElementById('messageBox');
+		var html = '<h3>USV INFO</h3>';
+		html += '<p>Power-L: <span style="float: right; margin-right: 25px;">' + round(_usv.power1, 2).toFixed((_usv.power1 == 100) ? 1: 2) + '%</span></p>';
+		html += '<p>Power-R: <span style="float: right; margin-right: 25px;">' + round(_usv.power2, 2).toFixed((_usv.power1 == 100) ? 1: 2) + '%</span></p>';
+		html += '<p>Degree: ∠' + round(_usv.degree, 2) + '°</p>';
+		html += '<p>Velocity: ' + round(Math.sqrt(_usv.vx * _usv.vx + _usv.vy * _usv.vy), 2) + '</p>';
+		html += '<p>vx: ' + round(_usv.vx, 2) + '</p>';
+		html += '<p>vy: ' + round(_usv.vy, 2) + '</p>';
+		html += '<p>Task: ' + round(task, 2) + '/500</p>';
+		html += '<h3>ENV INFO</h3>';
+		html += '<p>Water Speed: ' + round(Math.sqrt(_flow_velocity[0] * _flow_velocity[0] + _flow_velocity[1] * _flow_velocity[1]), 2) + '</p>';
+		html += '<p>Speed X: ' + round(_flow_velocity[0], 2) + '</p>';
+		html += '<p>Speed Y: ' + round(_flow_velocity[1], 2) + '</p>';
+		html += '<p>P: ' + round(Kp[0], 2) + '</p>';
+		html += '<p>I: ' + round(Ki[0], 6) + '</p>';
+		html += '<p>D: ' + round(Kd[0], 2) + '</p>';
+		msg.innerHTML = html;
+	}
+	
+	function updateVelocity(usv) {
+		var power_rate = 0.01;
+		var power_vx = usv.power1 * power_rate - usv.power2 * power_rate;
+		var power_vy = usv.power1 * power_rate + usv.power2 * power_rate;
+
+		var radian = getRadian(usv.degree);
+		var dx = power_vy * Math.sin(radian) + power_vx * Math.cos(radian);
+		var dy = power_vy * Math.cos(radian) - power_vx * Math.sin(radian);
+
+		var degree_rate = 0.01;
+		var degree = (usv.degree + (usv.power1 - usv.power2) * degree_rate) % 360;
+		if (degree > 180) degree = degree - 360;
+		if (degree < -180) degree = degree + 360;
+		
+		var rate = 0.01;
+		var vx = (usv.vx + dx * rate) * (1 - _friction);
+		var vy = (usv.vy + dy * rate) * (1 - _friction);
+
+		usv.vx = vx;
+		usv.vy = vy;
+		usv.degree = degree;
+	}
+	
+	function updatePosition(usv) {
+		var x = usv.x + usv.vx + _flow_velocity[0];
+		var y = usv.y - usv.vy + _flow_velocity[1];
+		/*
+		if (x < 0) {
+			x = canvas.width;
+			y = canvas.height - y;
+		}
+		
+		if (x > canvas.width) {
+			x = 0;
+			y = canvas.height - y;
+		}
+		
+		if (y > canvas.height) {
+			y = 0;
+			x = canvas.width - x;
+		}
+		
+		if (y < 0) {
+			y = canvas.height;
+			x = canvas.width - x;
+		}
+		*/
+		usv.x = x;
+		usv.y = y;
+	}
+	
+	function drawUSV(usv) {
+		var w = usv.w / 2;
+		var h = usv.h / 2;
+
+		ctx.save();
+		
+		ctx.fillStyle = 'rgba(255, 255, 0, 1)';
+		ctx.translate(usv.x, usv.y);
+		ctx.rotate(getRadian(usv.degree));
+		
+		ctx.beginPath();
+		ctx.moveTo(0, -h);
+		ctx.lineTo(w, h);
+		ctx.lineTo(-w, h);
+		ctx.fill();
+		
+		ctx.restore();
+	}
+
+	function getRadian(degree) {
+		return degree * Math.PI / 180;
+	}
+	
+	function round(val, count) {
+		var p = Math.pow(10, count);
+		return Math.round(val * p) / p;
+	}
+	
+	init();
+</script>
+</body>
+</html>
