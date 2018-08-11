@@ -1,79 +1,81 @@
-% ²MªÅµe­±
+% æ¸…ç©ºç•«é¢
 clear ; close all; clc
 
-styles = {'b+'; 'c+'; 'm+'; 'y+'; 'g+'; 'k+'; 'r+'; 'bs'; 'cs'; 'gs'};
+X = [];   % æ¨£æœ¬æ•¸æ“š
+m = 100;  % æ¯ç¾¤é›†æ•¸æ“šé‡
+n = 5;    % ç¾¤é›†æ•¸ç›®
+r = 4;    % æ•¸æ“šé‚Šç•Œ
+d = 3;    % ç¶­åº¦
+marker_style = 'o';
+marker_size = 5;
 
-% ÀH¾÷¥Í¥Í¸s¶°¼Ë¥»¼Æ¾Ú
-X = [];   % ¼Ë¥»¼Æ¾Ú
-m = 100;  % ¨C¸s¶°¼Æ¾Ú¶q
-n = 5;   % ¸s¶°¼Æ¥Ø
-r = 3;    % ¼Æ¾ÚÃä¬É
+% éš¨æ©Ÿç”Ÿç”Ÿç¾¤é›†æ¨£æœ¬æ•¸æ“š
 for i = 1:n
-  X(m*(i-1)+1:m*i,:) = rand(1, 2) * (r-1) + rand(m, 2);
-  y(m*(i-1)+1:m*i) = i;
+  X(m * (i - 1) + 1:m * i, :) = rand(1, d) * (r - 1) + rand(m, d);
+  y(m * (i - 1) + 1:m * i) = i;
 end
 
-% Åã¥Ü­ì¼Ë¥»¼Æ¾Ú
+% é¡¯ç¤ºåŸæ¨£æœ¬æ•¸æ“š
 figure(1);
+plot3(X(1, 1), X(1, 2), X(1, 3), marker_style, 'MarkerSize', marker_size);
+hold on;
 for i = 1:n
-  index = find(y == i);
-  hold on;
-  plot(X(index,1), X(index,2), styles{i}, 'MarkerSize', 5);
-  hold off;
+  indices = find(y == i);
+  %plot(X(indices, 1), X(indices, 2), marker_style, 'MarkerSize', marker_size);
+  plot3(X(indices, 1), X(indices, 2), X(indices, 3), marker_style, 'MarkerSize', marker_size);
 end
-printf("samples...(enter to next)...\n");
-pause;
+hold off;
+pause(1);
 
+% é¡¯ç¤ºç„¡å·®åˆ¥æ¨£æœ¬æ•¸æ“š
 figure(2);
-plot(X(:,1), X(:,2), styles{1}, 'MarkerSize', 5);
-printf("for reference...(enter to next)...\n");
-pause;
+%plot(X(:, 1), X(:, 2), marker_style, 'MarkerSize', marker_size);
+plot3(X(:, 1), X(:, 2), X(:, 3), marker_style, 'MarkerSize', marker_size);
+pause(1);
 
-for k = 1:size(styles)
+for k = 1:n*2
   printf("clustering (k=%d)...\n", k);
   
-  % ÀH¾÷¥Í¦¨¼Ğ°OÂI
-  Landmark = rand(k, 2) * r;
-  figure(3);
-  hold on;
-  plot(Landmark(:,1), Landmark(:,2), 'ko', 'MarkerSize', 10);
-  hold off;
+  % éš¨æ©Ÿç”Ÿæˆæ¨™è¨˜é»
+  Landmark = rand(k, d) * r;
 
   prev_error = 0;
   curr_error = 1;
   while (curr_error - prev_error) .^ 2 >= 0.1
-    % ­pºâ¼Ë¥»¼Æ¾Ú¨ì¼Ğ°OÂI»~®t, ¤Î©ÒÄİ¸s¶°
+    % è¨ˆç®—æ¨£æœ¬æ•¸æ“šåˆ°æ¨™è¨˜é»èª¤å·®, åŠæ‰€å±¬ç¾¤é›†
     for i = 1:k
-      ERROR(:, i) = sum((X - Landmark(i,:)) .^ 2, 2);
+      ERROR(:, i) = sum((X - Landmark(i, :)) .^ 2, 2);
     end
     prev_error = curr_error;
     curr_error = sum(sum(ERROR, 1), 2);
-    [v, y] = min(ERROR, [], 2);
+    [v, Y] = min(ERROR, [], 2);
 
-    % Åã¥Ü¤ÀÃşµ²ªG
+    % é¡¯ç¤ºæ¨™è¨˜é»åŠåˆ†é¡çµæœ
     figure(3);
-    plot(Landmark(:,1), Landmark(:,2), 'r.', 'MarkerSize', 30);
-
-    for i = 1:k
-      index = find(y == i);
-      hold on;
-      plot(X(index,1), X(index,2), styles{i}, 'MarkerSize', 5);
-      hold off;
-    end
+    %plot(Landmark(:, 1), Landmark(:, 2), 'r.', 'MarkerSize', 30);
+    plot3(Landmark(:, 1), Landmark(:, 2), Landmark(:, 3), 'r.', 'MarkerSize', 30);
     
-    % §ó·s¼Ğ°OÂI
+    hold on;
     for i = 1:k
-      index = find(y == i);
-      if size(index) > 0
-        Landmark(i,:) = mean(X(index,:));
+      indices = find(Y == i);
+      %plot(X(indices, 1), X(indices, 2), marker_style, 'MarkerSize', marker_size);
+      plot3(X(indices, 1), X(indices, 2), X(indices, 3), marker_style, 'MarkerSize', marker_size);
+    end
+    hold off;
+    
+    % æ›´æ–°æ¨™è¨˜é»
+    for i = 1:k
+      indices = find(Y == i);
+      if size(indices) > 0
+        Landmark(i, :) = mean(X(indices, :));
       else
-        Landmark(i,:) = rand(1, 2) * r;
+        Landmark(i, :) = rand(1, d) * r;
       endif
     end
     
     pause(0.1);
   end
-  printf("next...");
-  pause;
+  pause(1);
 end
+
 printf("END");
