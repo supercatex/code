@@ -1,54 +1,59 @@
 % 清空畫面
 clear ; close all; clc
 
-X = [];   % 樣本數據
-m = 100;  % 每群集數據量
-n = 5;    % 群集數目
-r = 3;    % 數據邊界
-d = 3;    % 維度
+function drawPoint(data, mkstyle, mksize, redraw = true)
+  if redraw == false
+    hold on;
+  endif
+  if size(data)(2) == 2
+    plot(data(:, 1), data(:, 2), mkstyle, 'MarkerSize', mksize);
+  elseif size(data)(2) == 3
+    plot3(data(:, 1), data(:, 2), data(:, 3), mkstyle, 'MarkerSize', mksize);
+  endif
+  if redraw == false
+    hold off;
+  endif
+endfunction
+
+X = [];                       % 樣本數據
+m = [50; 50; 150; 200; 500];  % 每群集數據量
+n = size(m);                  % 群集數目
+r = [15; 8; 8; 15; 15];       % 數據集中度
+R = 50;                       % 數據邊界
+d = 3;                        % 維度
 marker_style = 'o';
 marker_size = 5;
 
 % 隨機生生群集樣本數據
 for i = 1:n
-  X(m * (i - 1) + 1:m * i, :) = rand(1, d) * (r - 1) + rand(m, d);
-  y(m * (i - 1) + 1:m * i) = i;
+  X(end + 1:end + m(i), :) = rand(1, d) * (R - r(i)) + rand(m(i), d) * r(i);
+  y(end + 1:end + m(i)) = i;
 end
 
 % 顯示原樣本數據
 figure(1, 'position', [0, 550, 600, 450]);
-plot3(X(1, 1), X(1, 2), X(1, 3), marker_style, 'MarkerSize', marker_size);
-hold on;
+drawPoint(X(1,:), marker_style, marker_size);
 for i = 1:n
   indices = find(y == i);
-  %plot(X(indices, 1), X(indices, 2), marker_style, 'MarkerSize', marker_size);
-  plot3(X(indices, 1), X(indices, 2), X(indices, 3), marker_style, 'MarkerSize', marker_size);
+  drawPoint(X(indices, :), marker_style, marker_size, false);
 end
-hold off;
 pause(1);
 
 % 顯示無差別樣本數據
 figure(2, 'position', [600, 550, 600, 450]);
-%plot(X(:, 1), X(:, 2), marker_style, 'MarkerSize', marker_size);
-plot3(X(:, 1), X(:, 2), X(:, 3), marker_style, 'MarkerSize', marker_size);
+drawPoint(X, marker_style, marker_size);
 pause(1);
 
-Landmark(1, :) = mean(X);
 for k = 1:n
   printf("clustering (k=%d)...\n", k);
   
   % 生成標記點
   if k == 1
-    Landmark(1, :) = mean(X);
+    % 只有一個群集時為全部樣本重心位置
+    Landmark(k, :) = mean(X);
   else
-    max_size = 0;
-    max_index = 0;
-    for i = 1:k
-      if size(find(Y == i))(1, 1) > max_size
-        max_size = size(find(Y == i))(1, 1);
-        max_index = i;
-      endif
-    end
+    % 在最大的群集旁邊加一個新群集
+    [max_value, max_index] = max(max_error);
     Landmark(k, :) = Landmark(max_index, :) + rand(1, d) * 0.01;
   endif
 
@@ -66,16 +71,14 @@ for k = 1:n
 
     % 顯示標記點及分類結果
     figure(3, 'position', [0, 50, 600, 450]);
-    %plot(Landmark(:, 1), Landmark(:, 2), 'r.', 'MarkerSize', 30);
-    plot3(Landmark(:, 1), Landmark(:, 2), Landmark(:, 3), 'r.', 'MarkerSize', 40);
+    drawPoint(Landmark, 'r.', 40);
     
-    hold on;
     for i = 1:k
       indices = find(Y == i);
-      %plot(X(indices, 1), X(indices, 2), marker_style, 'MarkerSize', marker_size);
-      plot3(X(indices, 1), X(indices, 2), X(indices, 3), marker_style, 'MarkerSize', marker_size);
+      drawPoint(X(indices, :), marker_style, marker_size, false);
+      % 計算每個群集最遠的一點的距離
+      max_error(i) = max(sum((X(indices, :) - Landmark(i, :)) .^ 2, 2));
     end
-    hold off;
     
     % 更新標記點
     for i = 1:k
@@ -83,7 +86,8 @@ for k = 1:n
       if size(indices) > 0
         Landmark(i, :) = mean(X(indices, :));
       else
-          Landmark(i, :) = rand(1, d) * r;
+        % 該標記點完全沒有點時再隨機分配位置
+          Landmark(i, :) = rand(1, d) * R;
       endif
     end
     
@@ -92,4 +96,4 @@ for k = 1:n
   pause(1);
 end
 
-printf("END");
+printf("END...");
