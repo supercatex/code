@@ -27,7 +27,7 @@ if __name__ == '__main__':
     # Adding the first node into the Stack.
     S.append(T[0])
     
-    # Loop until Queue is empty.
+    # Loop until Stack is empty.
     while len(S) > 0:
         # Get one node from the Stack.
         node = S.pop()
