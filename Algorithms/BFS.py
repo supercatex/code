@@ -1,4 +1,3 @@
-from queue import Queue
 
 if __name__ == '__main__':
     # Tree contains 12 nodes.
@@ -24,19 +23,19 @@ if __name__ == '__main__':
         ]
     
     # Using data structure Queue in BFS.
-    Q = Queue()
+    Q = []
     
     # Adding the first node into the Queue.
-    Q.put(T[0])
+    Q.append(T[0])
     
     # Loop until Queue is empty.
-    while Q.empty() == False:
+    while len(Q) > 0:
         # Get one node from the Queue.
-        node = Q.get()
+        node = Q.pop(0)
         
         # do something here...
         print(tree_names[node])
         
         # Put all child nodes into the Queue.
         for i in R[node]:
-            Q.put(i)
+            Q.append(i)
