@@ -1,4 +1,3 @@
-
 if __name__ == '__main__':
     # Tree contains 12 nodes.
     tree_names = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
