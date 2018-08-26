@@ -53,5 +53,7 @@ git clone https://github.com/ROBOTIS-GIT/turtlebot3_msgs.git
 git clone https://github.com/ROBOTIS-GIT/turtlebot3.git
 cd ~/catkin_ws && catkin_make
 
+sudo apt-get install qtcreator
+
 echo "[Complete!!!]"
 exit 0
