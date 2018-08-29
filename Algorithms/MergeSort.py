@@ -3,6 +3,7 @@ import math
 def mergeSort(n):
     print('IN:', n)
     if len(n) <= 1:
+        print('RETURN:', n)
         return n 
     
     m = math.floor(len(n) / 2)
@@ -11,11 +12,14 @@ def mergeSort(n):
     print('BREAK TO:', a, b)
     
     a = mergeSort(a)
-    b = mergeSort(b)
-    print('SORTED:', a, b)
+    print('Now a = ', a)
     
+    b = mergeSort(b)
+    print('Now b = ', b)
+    
+    print('READY TO SORT:', a, b)
     result = []
-    while len(a) > 0 or len(b) > 0:
+    while not(len(a) == 0 and len(b) == 0):
         if len(a) > 0 and len(b) > 0:
             if a[0] < b[0]:
                 result.append(a.pop(0))
@@ -25,8 +29,8 @@ def mergeSort(n):
             result.append(b.pop(0))
         elif len(b) == 0:
             result.append(a.pop(0))
-    print('MERGE:', result)
-    
+            
+    print('RETURN MERGE SORT:', result)
     return result
         
     
