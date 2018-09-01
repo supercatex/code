@@ -5,14 +5,14 @@ def quickSort(n):
         return n 
     
     print('IN:', n)
-    ref = random.randint(0, len(n) - 1)
-    val = n.pop(ref)
-    print('REF:', val)
+    ref_index = random.randint(0, len(n) - 1)
+    ref = n.pop(ref_index)
+    print('REF:', ref)
     
     n1 = []
     n2 = []
     while len(n) > 0:
-        if n[0] < val:
+        if n[0] < ref:
             n1.append(n.pop(0))
         else:
             n2.append(n.pop(0))
@@ -20,9 +20,9 @@ def quickSort(n):
     
     n1 = quickSort(n1)
     n2 = quickSort(n2)
-    print('RETURN:', n1 + [val] + n2)
+    print('RETURN:', n1 + [ref] + n2)
     
-    return n1 + [val] + n2
+    return n1 + [ref] + n2
 
     
 if __name__ == '__main__':
