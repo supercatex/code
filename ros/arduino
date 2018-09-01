@@ -10,3 +10,6 @@ $ sudo udevadm trigger
 $ sudo apt-get install libncurses5-dev:i386
 
 export PATH=$PATH:$HOME/tools/arduino-1.8.2
+
+
+$ sudo apt-get install ros-kinetic-rosserial ros-kinetic-rosserial-server ros-kinetic-rosserialarduino
