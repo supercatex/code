@@ -1,0 +1,12 @@
+https://www.arduino.cc/en/Main/Software
+
+https://raw.githubusercontent.com/ROBOTIS-GIT/OpenCR/master/arduino/opencr_release/package_opencr_index.json
+
+$ wget https://raw.githubusercontent.com/ROBOTIS-GIT/OpenCR/master/99-opencr-cdc.rules
+$ sudo cp ./99-opencr-cdc.rules /etc/udev/rules.d/
+$ sudo udevadm control --reload-rules
+$ sudo udevadm trigger
+
+$ sudo apt-get install libncurses5-dev:i386
+
+export PATH=$PATH:$HOME/tools/arduino-1.8.2
