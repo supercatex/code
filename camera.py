@@ -27,3 +27,21 @@ while True:
 for i in range(size):
     cam[i].release()
 cv2.destroyAllWindows()
+
+
+import requests
+import time
+
+print('send')
+
+size = 2
+
+last_time = time.time()
+while True:
+    files = {}
+    for i in range(size):
+        files['media' + str(i)] = open('frame' + str(i) + '.jpg', 'rb')
+    url = 'http://usv.ddns.net/upload.php'
+    req = requests.post(url, files=files)
+    print('sent')
+    time.sleep(0.1)
