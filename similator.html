@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>LINE</title>
+<style>
+body { margin: 0; }
+</style>
+</head>
+<body>
+<div id="container">
+	<canvas id="canvas" width="600" height="600"></canvas>
+</div>
+
+<script>
+var canvas = document.getElementById("canvas");
+var ctx = canvas.getContext("2d");
+
+var _car = {
+	x: 50,
+	y: 100,
+	w: 20,
+	h: 20,
+	radian: 0,
+	vx: 0,
+	vy: 0,
+	wheel_1: 0,
+	wheel_2: 0
+};
+
+function init() {
+	draw();
+}
+
+function draw() {
+	ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+	draw_line();
+	draw_car(_car);
+	draw_center(_car);
+	update_car(_car);
+
+	window.requestAnimationFrame(draw);
+}
+
+function draw_line() {
+	ctx.save();
+	
+	ctx.beginPath();
+	ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+	ctx.moveTo(0, 100);
+	ctx.lineTo(0, 101);
+	ctx.lineTo(600, 101);
+	ctx.lineTo(600, 100);
+	ctx.fill();
+	
+	ctx.restore();
+}
+
+function draw_center(car) {
+	ctx.save();
+	
+	ctx.translate(car.x, car.y);
+	ctx.rotate(car.radian);
+	
+	ctx.beginPath();
+	ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+	ctx.moveTo(-car.w / 8, -car.h / 8);
+	ctx.lineTo(-car.w / 8, car.h / 8);
+	ctx.lineTo(car.w / 8, car.h / 8);
+	ctx.lineTo(car.w / 8, -car.h / 8);
+	ctx.fill();
+	
+	ctx.beginPath();
+	ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+	ctx.moveTo(-car.w / 8, -car.h / 8 + car.h / 2);
+	ctx.lineTo(-car.w / 8, car.h / 8 + car.h / 2);
+	ctx.lineTo(car.w / 8, car.h / 8 + car.h / 2);
+	ctx.lineTo(car.w / 8, -car.h / 8 + car.h / 2);
+	ctx.fill();
+	
+	ctx.beginPath();
+	ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+	ctx.moveTo(-car.w / 8, -car.h / 8 - car.h / 2);
+	ctx.lineTo(-car.w / 8, car.h / 8 - car.h / 2);
+	ctx.lineTo(car.w / 8, car.h / 8 - car.h / 2);
+	ctx.lineTo(car.w / 8, -car.h / 8 - car.h / 2);
+	ctx.fill();
+	
+	ctx.restore();
+}
+
+function draw_car(car) {
+	ctx.save();
+	
+	ctx.translate(car.x, car.y);
+	ctx.rotate(car.radian);
+	
+	ctx.beginPath();
+	ctx.fillStyle = 'rgba(255, 0, 0, 1)';
+	ctx.moveTo(-car.w / 2, -car.h / 2);
+	ctx.lineTo(-car.w / 2, car.h / 2);
+	ctx.lineTo(car.w / 2, 0);
+	ctx.fill();
+	
+	ctx.beginPath();
+	ctx.fillStyle = 'rgba(255, 255, 0, 1)';
+	ctx.moveTo(-car.w / 4, -car.h / 4);
+	ctx.lineTo(-car.w / 4, car.h / 4);
+	ctx.lineTo(car.w / 2, 0);
+	ctx.fill();
+	
+	ctx.restore();
+}
+
+function update_car(car) {
+	car.x += car.vx * Math.cos(car.radian) + car.vy * Math.cos(car.radian);
+	car.y += car.vy * Math.sin(car.radian) + car.vx * Math.sin(car.radian);
+	
+	var delta_wheel = car.wheel_1 - car.wheel_2;
+	var delta_radian = Math.asin(delta_wheel / (car.h / 2));
+	car.radian = (car.radian + delta_radian) % (2 * Math.PI);
+	
+	if (delta_wheel == 0) {
+		car.vx = car.wheel_1;
+		car.vy = 0;
+	} else {
+		var r1 = car.wheel_1 * car.h / delta_wheel;
+		var r2 = r1 - car.h;
+		var r3 = r1 - car.h / 2;
+		car.vx = (r1 * Math.sin(delta_radian) + r2 * Math.sin(delta_radian)) / 2;
+		car.vy = r3 - r3 * Math.cos(delta_radian);
+	}
+}
+
+init();
+</script>
+</body>
+</html>
