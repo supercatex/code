@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<head>
+		<title>Routing</title>
+		<meta charset="UTF-8">
+	</head>
+	<body style="margin: 0">
+		<div id="container" style="position: absolute"></div>
+<script>
+
+var _container = document.getElementById("container");
+
+const _size = 10;
+const _row = Math.floor(window.innerHeight / _size);
+const _col = Math.floor(window.innerWidth  / _size);
+
+const _robot_head_color_list = ["#000099", "#009900", "#990099", "#009999"];
+const _robot_color_list = ["#6666FF", "#66FF66", "#FF66FF", "#66FFFF"];
+
+const _init_total_robots = 2;
+const _init_total_targets = 10;
+const _init_human = false;
+const _routing_display = true;
+const _always_calc = true;
+var _speed = 10;
+
+var _pause = true;
+var _curr_targets = 0;
+var _robots = [];
+
+const _MODE_NORMAL = 0;
+const _MODE_ADD_WALL = 1;
+var _mode = _MODE_NORMAL;
+
+const _BOX_EMPTY = "EMPTY";
+const _BOX_WALL = "WALL";
+const _BOX_ROBOT = "ROBOT";
+const _BOX_TARGET = "TARGET";
+const _BOX_ROUTE = "ROUTE";
+const _BOX_HUMAN = "HUMAN";
+var _active_box_list = [_BOX_EMPTY, _BOX_TARGET, _BOX_ROUTE];
+
+var _human_direction = "UP";
+
+/*
+ *	EVENTS
+ */
+document.addEventListener("keydown", function(event) {
+	if (event.keyCode == 32) {
+		onclick_pause(event);
+	}
+	
+	if (event.keyCode == 38 && _human_direction != "DOWN") {		// UP
+		_human_direction = "UP";
+	}
+	
+	if (event.keyCode == 40 && _human_direction != "UP") {		// DOWN
+		_human_direction = "DOWN";
+	}
+	
+	if (event.keyCode == 37 && _human_direction != "RIGHT") {		// LEFT
+		_human_direction = "LEFT";
+	}
+	
+	if (event.keyCode == 39 && _human_direction != "LEFT") {		// RIGHT
+		_human_direction = "RIGHT";
+	}
+});
+
+function onclick_pause(event) {
+	_pause = !_pause;
+	
+	if (!_pause) {
+		for (var i = 0; i < _row; i++) {
+			for (var j = 0; j < _col; j++) {
+				var box = get_box(j, i);
+				if (get_box_type(box) == _BOX_ROUTE) {
+					set_box_type(box, _BOX_EMPTY);
+				}
+			}
+		}
+	} else {
+		for (var i = 0; i < _robots.length; i++) {
+			_robots[i][0].routing_list = [];
+		}
+	}
+}
+
+function onmousedown_box(event) {
+	if (!_pause) return;
+	if (!_active_box_list.includes(get_box_type(this))) return;
+	if (get_box_type(this) == _BOX_TARGET) return;
+	_mode = _MODE_ADD_WALL;
+	set_box_type(this, _BOX_WALL);
+}
+
+function onmouseup_box(event) {
+	_mode = _MODE_NORMAL;
+}
+
+function onmousemove_box(event) {
+	if (!_pause) return;
+	if (!_active_box_list.includes(get_box_type(this))) return;
+	if (get_box_type(this) == _BOX_TARGET) return;
+	if (_mode != _MODE_ADD_WALL) return;
+
+	set_box_type(this, _BOX_WALL);
+}
+
+/*
+ *	BOX
+ */
+function box_id(x, y) {
+	return "box_" + x + "_" + y;
+}
+
+function create_box(x, y, size) {
+	var ele = document.createElement("div");
+	ele.id = box_id(x, y);
+	ele.style["position"] = "absolute";
+	ele.style["left"] = size * x + "px";
+	ele.style["top"] = size * y + "px";
+	ele.style["width"] = size + "px";
+	ele.style["height"] = size + "px";
+	set_box_type(ele, _BOX_EMPTY);
+	
+	ele.addEventListener("mousedown", onmousedown_box);
+	ele.addEventListener("mouseup", onmouseup_box);
+	ele.addEventListener("mousemove", onmousemove_box);
+	
+	return ele;
+}
+
+function get_box(x, y) {
+	return document.getElementById(box_id(x, y));
+}
+
+function set_box_type(box, box_type, idx=0) {
+	if (box_type == _BOX_EMPTY) {
+		box.style["background-color"] = "#DDEEFF";
+		box.setAttribute("box_type", _BOX_EMPTY);
+	} else if (box_type == _BOX_WALL) {
+		box.style["background-color"] = "#000000";
+		box.setAttribute("box_type", _BOX_WALL);
+	} else if (box_type == _BOX_ROBOT) {
+		box.style["background-color"] = _robot_color_list[idx];
+		box.setAttribute("box_type", _BOX_ROBOT);
+	} else if (box_type == _BOX_TARGET) {
+		box.style["background-color"] = "#FF0000";
+		box.setAttribute("box_type", _BOX_TARGET);
+	} else if (box_type == _BOX_ROUTE) {
+		if (get_box_type(box) == _BOX_EMPTY) {
+			box.style["background-color"] = "#FFFF00";
+			box.setAttribute("box_type", _BOX_ROUTE);
+		}
+	}
+}
+
+function get_box_type(box) {
+	return box.getAttribute("box_type");
+}
+
+function get_next_active_box(x, y) {
+	var points = [];
+	
+	var box = get_box(x - 1, y);
+	if (box != null && _active_box_list.includes(get_box_type(box))) 
+		points.push([x - 1, y]);
+	
+	box = get_box(x + 1, y);
+	if (box != null && _active_box_list.includes(get_box_type(box))) 
+		points.push([x + 1, y]);
+	
+	box = get_box(x, y - 1);
+	if (box != null && _active_box_list.includes(get_box_type(box))) 
+		points.push([x, y - 1]);
+	
+	box = get_box(x, y + 1);
+	if (box != null && _active_box_list.includes(get_box_type(box))) 
+		points.push([x, y + 1]);
+
+	return points;
+}
+
+function get_next_random_active_box(x, y) {
+	var points = get_next_active_box(x, y);
+	var idx = Math.floor(Math.random() * points.length);
+	return points[idx];
+}
+
+function BFS(x, y) {
+	var checked_list = [];
+
+	var s = [];
+	s.push({"parent": null, "point": [x, y]});
+	
+	while (s.length > 0) {
+		var p = s.shift();
+
+		var px = p["point"][0];
+		var py = p["point"][1];
+		var k = px + "_" + py;
+		checked_list.push(k);
+
+		if (get_box_type(get_box(px, py)) == _BOX_TARGET) {
+			return p;
+		}
+		
+		var points = get_next_active_box(px, py);
+		for (var i = 0; i < points.length; i++) {
+			var k = points[i][0] + "_" + points[i][1];
+			if (checked_list.indexOf(k) == -1) {
+				s.push({"parent": p, "point": points[i]});
+				checked_list.push(k);
+			}
+		}
+	}
+	
+	return null;
+}
+
+function get_routing_list(robot_idx) {
+	if (_curr_targets == 0) return [];
+	var robot = _robots[robot_idx][0];
+	
+	var p = BFS(robot.x, robot.y);
+	if (p == null) return [];
+	
+	var ret = [];
+	while (p["parent"]["parent"] != null) {
+		ret.unshift(p["point"]);
+		p = p["parent"];
+	}
+	ret.unshift(p["point"]);
+	
+	return ret;
+}
+
+function add_target(x, y) {
+	if (get_box_type(get_box(x, y)) == _BOX_EMPTY) {
+		_curr_targets += 1;
+		set_box_type(get_box(x, y), _BOX_TARGET);
+		return true;
+	}
+	return false;
+}
+
+function add_random_target() {
+	while (true) {
+		var rx = Math.floor(Math.random() * _col);
+		var ry = Math.floor(Math.random() * _row);
+		var ret = add_target(rx, ry);
+		if (ret) break;
+	}
+}
+
+function add_robot(x, y, idx, is_auto=true) {
+	if (get_box_type(get_box(x, y)) == _BOX_EMPTY) {
+		var obj = {};
+		obj.x = x;
+		obj.y = y;
+		obj.routing_list = [];
+		obj.is_auto = is_auto;
+		_robots[idx].push(obj);
+		set_box_type(get_box(x, y), _BOX_ROBOT, idx);
+		return true;
+	}
+	return false;
+}
+
+function add_random_robot(is_auto=true) {
+	_robots.push([]);
+	while (true) {
+		var rx = Math.floor(Math.random() * _col);
+		var ry = Math.floor(Math.random() * _row);
+		var ret = add_robot(rx, ry, _robots.length - 1, is_auto);
+		if (ret) break;
+	}
+}
+
+/*
+ *	Main Program.
+ */
+ 
+for (var i = 0; i < _row; i++) {
+	for (var j = 0; j < _col; j++) {
+		var box = create_box(j, i, _size);
+		_container.append(box);
+	}
+}
+
+for (var i = 0; i < _init_total_robots; i++) {
+	add_random_robot();
+}
+if (_init_human) {
+	add_random_robot(false);
+}
+
+for (var i = 0; i < _init_total_targets; i++) {
+	add_random_target();
+}
+
+setInterval(function() {
+	if (_pause) return;
+
+	for (var j = 0; j < _robots.length; j++) {
+		var prev_point = [];
+		var is_target = false;
+		for (var i = 0; i < _robots[j].length; i++) {
+			var robot = _robots[j][i];
+
+			var curr_box = get_box(robot.x, robot.y);
+			set_box_type(curr_box, _BOX_EMPTY);
+			
+			if (i == 0) {
+				if (robot.is_auto) {
+					if (_routing_display) {
+						for (k = 0; k < robot.routing_list.length - 1; k++) {
+							var p = robot.routing_list[k];
+							if (get_box_type(get_box(p[0], p[1])) == _BOX_ROUTE) {
+								set_box_type(get_box(p[0], p[1]), _BOX_EMPTY);
+							}
+						}
+						if (_always_calc || robot.routing_list.length == 0) {
+							robot.routing_list = get_routing_list(j);
+						}
+						for (k = 0; k < robot.routing_list.length - 1; k++) {
+							var p = robot.routing_list[k];
+							set_box_type(get_box(p[0], p[1]), _BOX_ROUTE);
+						}
+					} else {
+						robot.routing_list = get_routing_list(j);
+					}
+				} else {
+					var nx = robot.x;
+					var ny = robot.y;
+					if (_human_direction == "UP") ny -= 1;
+					if (_human_direction == "DOWN") ny += 1;
+					if (_human_direction == "LEFT") nx -= 1;
+					if (_human_direction == "RIGHT") nx += 1;
+					
+					if (nx < 0 || nx >= _col || ny < 0 || ny >= _row) {
+						console.log(j + "CRASH!");
+						onclick_pause(); 
+					}
+					robot.routing_list = [[nx, ny]];
+				}
+				
+				var next_point = robot.routing_list.shift();
+				if (next_point == null) {
+					next_point = get_next_random_active_box(robot.x, robot.y);
+					if (next_point == null) {
+						next_point = [robot.x, robot.y];
+						console.log(j + " NO WAY!");
+						onclick_pause();
+					}
+				}
+				
+				var box_type = get_box_type(get_box(next_point[0], next_point[1]));
+				if (box_type == _BOX_TARGET) {
+					is_target = true;
+				} else if (!_active_box_list.includes(box_type)) {
+					console.log(j + " CRASH!");
+					onclick_pause();
+				}
+			} else {
+				var next_point = prev_point;
+			}
+			
+			var next_box = get_box(next_point[0], next_point[1]);
+			set_box_type(next_box, _BOX_ROBOT, j);
+			if (i == 0) {
+				next_box.style["background-color"] = _robot_head_color_list[j];
+			}
+			
+			prev_point = [robot.x, robot.y];
+			robot.x = next_point[0];
+			robot.y = next_point[1];
+		}
+		
+		if (is_target) {
+			add_robot(prev_point[0], prev_point[1], j);
+			_curr_targets -= 1;
+			add_random_target();
+		}
+	}
+}, _speed);
+
+</script>
+	</body>
+</html>
