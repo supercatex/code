@@ -1,4 +1,5 @@
 import cv2 as cv
+import numpy as np
 
 
 def preprocessing(image):
@@ -24,7 +25,7 @@ def find_white_board(image):
         return image
 
     x, y, w, h = cv.boundingRect(max_cnt)
-    return image[y:y+h, x:x+w]
+    return image[y:y+h, x:x+w].copy()
 
 
 def find_main_white_board(image):
@@ -66,29 +67,39 @@ def find_main_white_board(image):
     max_y = min(max_y + space, image_h)
     min_x = max(min_x - space, 0)
     max_x = min(max_x + space, image_w)
-    return image[min_y:max_y, min_x:max_x]
+    return image[min_y:max_y, min_x:max_x].copy()
 
 
-def find_num_of_shapes(image):
+def find_num_of_shapes(image, is_draw=False):
     num_of_shapes = {
         "circle": 0,
         "line": 0,
         "triangle": 0,
         "rectangle": 0
     }
+    image = cv.resize(image, (800, 450))
     thresh = preprocessing(image)
     thresh = 255 - thresh
     contours, _ = cv.findContours(thresh, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
     for cnt in contours:
         area = cv.contourArea(cnt)
         if area > 100:
-            cv.drawContours(image, [cnt], 0, (0, 255, 0), 2)
-
             x, y, w, h = cv.boundingRect(cnt)
             epsilon = 0.03 * cv.arcLength(cnt, True)
             approx = cv.approxPolyDP(cnt, epsilon, True)
-            vertex = len(approx)
-            cv.putText(image, str(vertex), (x + int(w / 2) - 5, y + int(h / 2) + 5), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), lineType=cv.LINE_AA)
+
+            vertex = 0
+            for i in range(len(approx)):
+                p1 = approx[i]
+                p2 = approx[(i+1)%len(approx)]
+                e = np.sqrt(np.sum(abs(p1 - p2) ** 2))
+                if e >= 15:
+                    vertex += 1
+            # vertex = len(approx)
+
+            if is_draw:
+                cv.drawContours(image, [cnt], 0, (0, 255, 0), 2)
+                cv.putText(image, str(vertex), (x + int(w / 2) - 5, y + int(h / 2) + 5), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), lineType=cv.LINE_AA)
 
             if vertex == 2:
                 num_of_shapes["line"] += 1
@@ -102,15 +113,17 @@ def find_num_of_shapes(image):
     return image, num_of_shapes
 
 
-for i in range(1, 5):
-    img = cv.imread("images/" + str(i) + ".jpg", cv.IMREAD_COLOR)
-    img = cv.resize(img, (int(img.shape[1] / 2), int(img.shape[0] / 2)))
+if __name__ == "__main__":
+    for i in range(1, 5):
+        img = cv.imread("images/" + str(i) + ".jpg", cv.IMREAD_COLOR)
+        img = cv.resize(img, (800, 600))
 
-    board = find_white_board(img)
-    board = find_main_white_board(board)
-    board, num_of_shapes = find_num_of_shapes(board)
-    print(num_of_shapes)
+        board = find_white_board(img)
+        board = find_main_white_board(board)
+        board, ans = find_num_of_shapes(board, True)
+        print(ans)
 
-    cv.imshow("image", img)
+        cv.imshow("image", img)
+        cv.imshow("board", board)
 
-    cv.waitKey(0)
+        cv.waitKey(0)
