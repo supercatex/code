@@ -275,11 +275,11 @@ def minimax(depth: int, find_max: int = 1, alpha: int = -np.inf, beta: int = np.
 
     choices = get_choices()
     for choice in choices:
-        move(choice)        # 模擬下棋
-        next_player()       # 變成下一位玩家
+        move(choice)                 # 模擬下棋
+        next_player()                # 變成下一位玩家
         next_best_value, _ = minimax(depth - 1, -find_max, alpha, beta)
-        move_back(choice)   # 還原下棋
-        prev_player()       # 變回上一位玩家
+        move_back(choice)            # 還原下棋
+        prev_player()                # 變回上一位玩家
 
         # 乘 $find_max$ 相當於改變大小於符號
         if next_best_value * find_max > best_value * find_max:
