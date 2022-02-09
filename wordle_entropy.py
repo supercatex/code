@@ -12,6 +12,7 @@ Wordle: https://www.powerlanguage.co.uk/wordle/
 
 Using Entropy Information Theory
 https://en.wikipedia.org/wiki/Entropy_(information_theory)
+https://hackmd.io/@sXG2cRDpRbONCsrtz8jfqg/ry-0k0PwH
 
     (E)xpected value, (P)robability, (I)nformation value, (b)ase
     I(E) = log(1/P(E), b)
