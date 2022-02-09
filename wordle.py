@@ -1,3 +1,27 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# author            : Kinda Lam
+# email             : LamKinUn@gmail.com
+# date              : 2022-02-09
+# license           : MIT
+# py version        : 3.8.10
+
+"""
+
+Wordle: https://www.powerlanguage.co.uk/wordle/
+
+Using Entropy Information Theory
+https://en.wikipedia.org/wiki/Entropy_(information_theory)
+
+    (E)xpected value, (P)robability, (I)nformation value, (b)ase
+    I(E) = log(1/P(E), b)
+         = -log(P(E), b)
+    Entropy(X) = E[I(X)] = E[-log(P(X), b)]
+               = -sum(P(xi) * log(P(xi), b)
+
+"""
+
+
 import math
 import random
 from itertools import product
@@ -22,7 +46,7 @@ def get_match_words(guess: str, words: [str], pattern: str) -> [str]:
             else:
                 if guess[i] in word:
                     for j, c in enumerate(word):
-                        if guess[i] == c and pattern[i] != 'A':
+                        if guess[i] == c and pattern[j] != 'A':
                             is_match = False
                             break
                     if not is_match:
@@ -33,20 +57,20 @@ def get_match_words(guess: str, words: [str], pattern: str) -> [str]:
 
 
 def get_entropy(word: str, words: [str]) -> float:
-    h = 0.0
+    entropy = 0.0
     for pattern in product(['A', 'B', 'X'], repeat=5):
         new_words = get_match_words(word, words, "".join(pattern))
         px = len(new_words) / len(words)
-        h += 0 if px == 0 else -px * math.log2(px)
-    return h
+        entropy += -px * math.log(px, 3) if px != 0 else 0
+    return entropy
 
 
-def get_next_guess(words: [str], max_n_calc: int) -> str:
-    h: {str, float} = {}
+def get_entropy_map(words: [str], max_n_calc: int) -> {str, float}:
+    entropy_map: {str, float} = {}
     for word in words[:max_n_calc]:
-        h[word] = get_entropy(word, words[:max_n_calc])
-    h = dict(sorted(h.items(), key=lambda x: x[1], reverse=True))
-    return next(iter(h))
+        entropy_map[word] = get_entropy(word, words[:max_n_calc])
+    entropy_map = dict(sorted(entropy_map.items(), key=lambda x: x[1], reverse=True))
+    return entropy_map
 
 
 def get_pattern(guess: str, answer: str) -> str:
@@ -61,26 +85,55 @@ def get_pattern(guess: str, answer: str) -> str:
     return pattern
 
 
-def play_one_game(max_n_calc: int) -> int:
-    global _words
-    random.shuffle(_words)
-    answer = random.choice(_words)
-    print("ANSWER: %s         %d" % (answer, len(_words)))
+def play_one_game(
+        words: [str],
+        max_n_calc: int,
+        human_playing: bool,
+        human_checking: bool
+) -> int:
+    random.shuffle(words)
+    answer = random.choice(words)
+    if not human_playing:
+        print("ANSWER: %s         %d" % (answer, len(words)))
+    if human_checking: answer = "?????"
 
     n_guess = 0
-    next_words = _words.copy()
+    next_words = words
     guess = ""
     while guess != answer:
         n_guess += 1
         curr_words = next_words
-        guess = get_next_guess(curr_words, max_n_calc)
-        pattern = get_pattern(guess, answer)
+        print("Calculating entropy map.....")
+        entropy_map = get_entropy_map(curr_words, max_n_calc)
+        if human_playing:
+            print("Suggestions for you:")
+            for i, (k, v) in enumerate(entropy_map.items()):
+                if i == 5: break
+                print("     -> %d. %s (%.4f)" % (i + 1, k, v))
+            guess = input("Guess:")
+            while guess not in words:
+                print("Not in word list!")
+                guess = input("Guess again:")
+        else:
+            guess = next(iter(entropy_map))
+        if human_checking:
+            pattern = input("Pattern:")
+            while len(pattern) != len(guess) or not set(pattern).issubset({'A', 'B', 'X'}):
+                print("Pattern only contain 'A', 'B', 'X'!")
+                pattern = input("Pattern:")
+            if pattern == "AAAAA": answer = guess
+        else:
+            pattern = get_pattern(guess, answer)
         next_words = get_match_words(guess, curr_words, pattern)
         print("     %d. %s: %s, %d" % (n_guess, guess, pattern, len(next_words)))
+        if len(next_words) == 0:
+            print("Something wrong!")
+            raise NameError("Answer not in the word list!")
+    print("BINGO!\n")
     return n_guess
 
 
-def run(path: str, max_n_calc: int):
+def auto_test(path: str, words: [str], max_n_calc: int):
     with open(path, "a+") as f:
         pass
     with open(path, "r") as f:
@@ -89,7 +142,7 @@ def run(path: str, max_n_calc: int):
     while True:
         epoch += 1
         print("ROUND: %d" % epoch)
-        n_guess = play_one_game(max_n_calc)
+        n_guess = play_one_game(words, max_n_calc, False, False)
         with open(path, "a+") as f:
             f.write("%d\n" % n_guess)
 
@@ -97,6 +150,7 @@ def run(path: str, max_n_calc: int):
 if __name__ == "__main__":
     while True:
         try:
-            run("history.txt", 300)
+            # auto_test("entropy_history.txt", _words, 300)
+            play_one_game(_words, 300, True, True)
         except Exception as e:
-            print(e)
+            print("ERROR:", e)
