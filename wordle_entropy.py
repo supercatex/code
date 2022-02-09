@@ -57,19 +57,19 @@ def get_match_words(guess: str, words: [str], pattern: str) -> [str]:
     return match_words
 
 
-def get_entropy(word: str, words: [str]) -> float:
+def get_entropy(word: str, words: [str], base: float) -> float:
     entropy = 0.0
     for pattern in product(['A', 'B', 'X'], repeat=5):
         new_words = get_match_words(word, words, "".join(pattern))
         px = len(new_words) / len(words)
-        entropy += -px * math.log(px, 3) if px != 0 else 0
+        entropy += -px * math.log(px, base) if px != 0 else 0
     return entropy
 
 
-def get_entropy_map(words: [str], max_n_calc: int) -> {str, float}:
+def get_entropy_map(words: [str], max_n_calc: int, base: float) -> {str, float}:
     entropy_map: {str, float} = {}
     for word in words[:max_n_calc]:
-        entropy_map[word] = get_entropy(word, words[:max_n_calc])
+        entropy_map[word] = get_entropy(word, words[:max_n_calc], base)
     entropy_map = dict(sorted(entropy_map.items(), key=lambda x: x[1], reverse=True))
     return entropy_map
 
@@ -89,6 +89,7 @@ def get_pattern(guess: str, answer: str) -> str:
 def play_one_game(
         words: [str],
         max_n_calc: int,
+        base: float,
         human_playing: bool,
         human_checking: bool
 ) -> int:
@@ -105,7 +106,7 @@ def play_one_game(
         n_guess += 1
         curr_words = next_words
         print("Calculating entropy map.....")
-        entropy_map = get_entropy_map(curr_words, max_n_calc)
+        entropy_map = get_entropy_map(curr_words, max_n_calc, base)
         if human_playing:
             print("Suggestions for you:")
             for i, (k, v) in enumerate(entropy_map.items()):
@@ -134,7 +135,7 @@ def play_one_game(
     return n_guess
 
 
-def auto_test(path: str, words: [str], max_n_calc: int):
+def auto_test(path: str, words: [str], max_n_calc: int, base: float):
     with open(path, "a+") as f:
         pass
     with open(path, "r") as f:
@@ -143,7 +144,7 @@ def auto_test(path: str, words: [str], max_n_calc: int):
     while True:
         epoch += 1
         print("ROUND: %d" % epoch)
-        n_guess = play_one_game(words, max_n_calc, False, False)
+        n_guess = play_one_game(words, max_n_calc, base, False, False)
         with open(path, "a+") as f:
             f.write("%d\n" % n_guess)
 
@@ -151,7 +152,7 @@ def auto_test(path: str, words: [str], max_n_calc: int):
 if __name__ == "__main__":
     while True:
         try:
-            auto_test("entropy_history.txt", _words, 300)
-            # play_one_game(_words, 300, True, True)
+            auto_test("entropy_100_2.txt", _words, 100, 2)
+            # play_one_game(_words, 300, True, True, 2)
         except Exception as e:
             print("ERROR:", e)
