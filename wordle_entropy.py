@@ -150,7 +150,7 @@ def auto_test(path: str, words: [str], max_n_calc: int):
 if __name__ == "__main__":
     while True:
         try:
-            # auto_test("entropy_history.txt", _words, 300)
-            play_one_game(_words, 300, True, True)
+            auto_test("entropy_history.txt", _words, 300)
+            # play_one_game(_words, 300, True, True)
         except Exception as e:
             print("ERROR:", e)
