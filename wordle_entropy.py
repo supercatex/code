@@ -72,13 +72,17 @@ def get_entropy(word: str, words: [str], base: float) -> float:
     return entropy
 
 
-def get_entropy_map(curr_words: [str], words: [str], base: float, time_limit: float) -> {str, float}:
+def get_entropy_map(curr_words: [str], words: [str], time_limit: float) -> {str, float}:
+    random.shuffle(words)
     entropy_map: {str, float} = {}
+    base: float = math.e
     st: float = time.time()
-    for word in words:
+    for i, word in enumerate(words):
+        print("\r......calculating...... %.2fs (%d/%d)" % (time.time() - st, i, len(words)), end="")
         entropy_map[word] = get_entropy(word, curr_words, base)
         if time_limit != 0 and time.time() - st > time_limit: break
-    entropy_map = dict(sorted(entropy_map.items(), key=lambda x: x[1] ** len(set(x[0])), reverse=True))
+    print("\r", end="")
+    entropy_map = dict(sorted(entropy_map.items(), key=lambda x: x[1] / (6 - len(set(x[0]))), reverse=True))
     return entropy_map
 
 
@@ -99,7 +103,6 @@ def get_pattern(guess: str, answer: str) -> str:
 
 def play_one_game(
         words: [str],
-        base: float,
         time_limit: float,
         fixed_words: [str],
         human_player: bool,
@@ -116,8 +119,9 @@ def play_one_game(
     guess: str = ""
     curr_words: [str] = words
     while guess != answer:
+        entropy_map: {str, float} = {}
         if n_guess >= len(fixed_words) or fixed_words[n_guess] not in words:
-            entropy_map: {str, float} = get_entropy_map(curr_words, words, base, time_limit)
+            entropy_map = get_entropy_map(curr_words, words, time_limit)
 
             guess = next(iter(entropy_map))
             if len(curr_words) <= 2: guess = curr_words[0]
@@ -139,11 +143,11 @@ def play_one_game(
         curr_words = get_match_words(guess, curr_words, pattern)
 
         n_guess += 1
-        print(n_guess, ". GUESS:", guess, "| PATTERN:", pattern, curr_words[:10])
+        print(n_guess, ". GUESS:", guess, "|", pattern, "|", len(entropy_map), "|", len(curr_words), curr_words[:10])
     return n_guess
 
 
-def auto_test(path: str, words: [str], base: float, time_limit: float, fixed_words: [str]):
+def auto_test(path: str, words: [str], time_limit: float, fixed_words: [str]):
     with open(path, "a+"): pass
     with open(path, "r") as f:
         epoch: int = len(f.readlines())
@@ -151,7 +155,7 @@ def auto_test(path: str, words: [str], base: float, time_limit: float, fixed_wor
     while True:
         epoch += 1
         print("ROUND: %d" % epoch)
-        n_guess: int = play_one_game(words, base, time_limit, fixed_words, False, False)
+        n_guess: int = play_one_game(words, time_limit, fixed_words, False, False)
         with open(path, "a+") as f:
             f.write("%d\n" % n_guess)
 
@@ -190,20 +194,21 @@ def show_history(path: str, delay: int, skip: int):
 if __name__ == "__main__":
     while True:
         try:
-            _base: int = 3
-            _time_limit: float = 5
-            _fixed_words: [str] = []
-            _path: str = "entropy_%d_%d_%s.txt" % (_base, _time_limit, "_".join(_fixed_words))
+            _time_limit: float = 30
+            _fixed_words: [str] = ["tares"]
+            # _fixed_words: [str] = ["thale", "sword", "cumin"]
+            _path: str = "entropy_%d_%s.txt" % (_time_limit, "_".join(_fixed_words))
 
-            # 4 different modes.
             _mode: int = 0
-    
+            import sys
+            if len(sys.argv) >= 2: _mode = int(sys.argv[1])
+
             if _mode == 0:    # Human player.
-                play_one_game(_words, _base, _time_limit, [], True, False)
+                play_one_game(_words, _time_limit, [], True, False)
             elif _mode == 1:  # Human player and checker.
-                play_one_game(_words, _base, _time_limit, [], True, True)
+                play_one_game(_words, _time_limit, [], True, True)
             elif _mode == 2:  # Auto test.
-                auto_test(_path, _words, _base, _time_limit, _fixed_words)
+                auto_test(_path, _words, _time_limit, _fixed_words)
             elif _mode == 3:  # Show auto test history.
                 show_history(_path, 1, 100)
         except Exception as e:
