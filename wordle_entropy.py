@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # author            : Kinda Lam
 # email             : LamKinUn@gmail.com
-# date              : 2022-02-09
+# date              : 2022-02-10
 # license           : MIT
 # py version        : 3.8.10
 
@@ -108,11 +108,15 @@ def get_pattern(guess: str, answer: str) -> str:
 def play_one_game(
         words: [str],
         base: float,
-        time_limit: float
+        time_limit: float,
+        human_playing: bool,
+        human_checking: bool
 ) -> int:
     random.shuffle(words)
-    answer: str = random.choice(words)
-    print("ANSWER:", answer)
+    answer: str = "?????"
+    if not human_playing:
+        answer = random.choice(words)
+        print("ANSWER:", answer)
 
     n_guess: int = 0
     guess: str = ""
@@ -120,11 +124,21 @@ def play_one_game(
     while guess != answer:
         entropy_map: {str, float} = get_entropy_map(curr_words, words, base, time_limit)
 
-        if len(curr_words) <= 2:
-            guess = curr_words[0]
-        else:
-            guess = next(iter(entropy_map))
+        guess = next(iter(entropy_map))
+        if len(curr_words) <= 2: guess = curr_words[0]
+        if human_playing:
+            print("Suggestions:")
+            if len(curr_words) <= 2:
+                print(curr_words)
+            else:
+                for i, (k, v) in enumerate(entropy_map.items()):
+                    if i == 5: break
+                    print("%d. %s (%.4f)" % (i + 1, k, v))
+            guess = input("GUESS:")
+
         pattern: str = get_pattern(guess, answer)
+        if human_checking: pattern = input("PATTERN:")
+
         curr_words = get_match_words(guess, curr_words, pattern)
 
         n_guess += 1
@@ -140,7 +154,7 @@ def auto_test(path: str, words: [str], base: float, time_limit: float):
     while True:
         epoch += 1
         print("ROUND: %d" % epoch)
-        n_guess: int = play_one_game(words, base, time_limit)
+        n_guess: int = play_one_game(words, base, time_limit, False, False)
         with open(path, "a+") as f:
             f.write("%d\n" % n_guess)
 
@@ -158,17 +172,16 @@ def show_history(path: str, delay: int, skip: int):
     sum_y: int = 0
     plt.ion()
     for i in range(len(data)):
-        plt.cla()
-        if i == 0: plt.pause(delay)
-
         y[data[i]] += 1
         sum_y += data[i]
         if i % skip == 0 or i == len(data) - 1:
+            if i == 0: plt.pause(delay)
+            plt.cla()
             plt.bar(x[1:], y[1:], color="b")
             plt.ylim(0, max(y) + 20)
-            for j in range(len(x)):
+            for j in range(1, len(x)):
                 plt.text(x[j] - .25, y[j] + 1.5, str(y[j]), color="blue")
-            plt.text(0, max(y) + 20, "Avg: %.4f" % (sum_y / (i + 1)), color="blue")
+            plt.text(0, max(y) + 20, "Sum: %d, Avg: %.4f" % (sum(y), sum_y / (i + 1)), color="blue")
             plt.pause(0.001)
     plt.ioff()
     plt.show()
@@ -184,9 +197,8 @@ if __name__ == "__main__":
             _time_limit = 5
             _path = "entropy_%d_%d.txt" % (_base, _time_limit)
 
-            # auto_test(_path, _words, _base, _time_limit)
-            # play_one_game(_words, 3, 5)
-
-            show_history(_path, 1, 10)
+            auto_test(_path, _words, _base, _time_limit)
+            # play_one_game(_words, _base, _time_limit, True, True)
+            # show_history(_path, 1, 1000)
         except Exception as e:
             print("ERROR:", e)
