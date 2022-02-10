@@ -75,17 +75,9 @@ def get_entropy(word: str, words: [str], base: float) -> float:
 def get_entropy_map(curr_words: [str], words: [str], base: float, time_limit: float) -> {str, float}:
     entropy_map: {str, float} = {}
     st: float = time.time()
-    # i = 1
     for word in words:
         entropy_map[word] = get_entropy(word, curr_words, base)
         if time_limit != 0 and time.time() - st > time_limit: break
-        # print("%05d. %s %.4f" % (i, word, entropy_map[word]))
-        # if i % 10 == 0:
-        #     em = dict(sorted(entropy_map.items(), key=lambda x: x[1] ** len(set(x[0])), reverse=True))
-        #     with open("words_entropy_map2.txt", "w+") as f:
-        #         for k, v in em.items():
-        #             f.write("%s %.20f\n" % (k, v))
-        # i = i + 1
     entropy_map = dict(sorted(entropy_map.items(), key=lambda x: x[1] ** len(set(x[0])), reverse=True))
     return entropy_map
 
@@ -109,35 +101,40 @@ def play_one_game(
         words: [str],
         base: float,
         time_limit: float,
-        human_playing: bool,
-        human_checking: bool
+        fixed_words: [str],
+        human_player: bool,
+        human_checker: bool
 ) -> int:
     random.shuffle(words)
     answer: str = "?????"
-    if not human_playing:
+    if not human_checker:
         answer = random.choice(words)
+    if not human_player:
         print("ANSWER:", answer)
 
     n_guess: int = 0
     guess: str = ""
     curr_words: [str] = words
     while guess != answer:
-        entropy_map: {str, float} = get_entropy_map(curr_words, words, base, time_limit)
+        if n_guess >= len(fixed_words) or fixed_words[n_guess] not in words:
+            entropy_map: {str, float} = get_entropy_map(curr_words, words, base, time_limit)
 
-        guess = next(iter(entropy_map))
-        if len(curr_words) <= 2: guess = curr_words[0]
-        if human_playing:
-            print("Suggestions:")
-            if len(curr_words) <= 2:
-                print(curr_words)
-            else:
-                for i, (k, v) in enumerate(entropy_map.items()):
-                    if i == 5: break
-                    print("%d. %s (%.4f)" % (i + 1, k, v))
-            guess = input("GUESS:")
+            guess = next(iter(entropy_map))
+            if len(curr_words) <= 2: guess = curr_words[0]
+            if human_player:
+                print("Suggestions:")
+                if len(curr_words) <= 2:
+                    print(curr_words)
+                else:
+                    for i, (k, v) in enumerate(entropy_map.items()):
+                        if i == 5: break
+                        print("%d. %s (%.4f)" % (i + 1, k, v))
+                guess = input("GUESS:")
+                if guess == "quit": exit(1)
+        else: guess = fixed_words[n_guess]
 
         pattern: str = get_pattern(guess, answer)
-        if human_checking: pattern = input("PATTERN:")
+        if human_checker: pattern = input("PATTERN:")
 
         curr_words = get_match_words(guess, curr_words, pattern)
 
@@ -146,7 +143,7 @@ def play_one_game(
     return n_guess
 
 
-def auto_test(path: str, words: [str], base: float, time_limit: float):
+def auto_test(path: str, words: [str], base: float, time_limit: float, fixed_words: [str]):
     with open(path, "a+"): pass
     with open(path, "r") as f:
         epoch: int = len(f.readlines())
@@ -154,7 +151,7 @@ def auto_test(path: str, words: [str], base: float, time_limit: float):
     while True:
         epoch += 1
         print("ROUND: %d" % epoch)
-        n_guess: int = play_one_game(words, base, time_limit, False, False)
+        n_guess: int = play_one_game(words, base, time_limit, fixed_words, False, False)
         with open(path, "a+") as f:
             f.write("%d\n" % n_guess)
 
@@ -180,8 +177,10 @@ def show_history(path: str, delay: int, skip: int):
             plt.bar(x[1:], y[1:], color="b")
             plt.ylim(0, max(y) + 20)
             for j in range(1, len(x)):
-                plt.text(x[j] - .25, y[j] + 1.5, str(y[j]), color="blue")
-            plt.text(0, max(y) + 20, "Sum: %d, Avg: %.4f" % (sum(y), sum_y / (i + 1)), color="blue")
+                plt.text(x[j] - .25, y[j] + 3, str(y[j]), color="blue")
+            plt.text(0, max(y) + 20, "Sum: %d, Avg: %.4f, Less than 6: %.2f%%" % (
+                sum(y), sum_y / (i + 1), sum(y[:7]) / sum(y) * 100
+            ), color="blue")
             plt.pause(0.001)
     plt.ioff()
     plt.show()
@@ -189,16 +188,23 @@ def show_history(path: str, delay: int, skip: int):
 
 
 if __name__ == "__main__":
-    # get_entropy_map(_words, _words, 3, 0)
-    # exit(1)
     while True:
         try:
-            _base = 3
-            _time_limit = 5
-            _path = "entropy_%d_%d.txt" % (_base, _time_limit)
+            _base: int = 3
+            _time_limit: float = 5
+            _fixed_words: [str] = []
+            _path: str = "entropy_%d_%d_%s.txt" % (_base, _time_limit, "_".join(_fixed_words))
 
-            auto_test(_path, _words, _base, _time_limit)
-            # play_one_game(_words, _base, _time_limit, True, True)
-            # show_history(_path, 1, 1000)
+            # 4 different modes.
+            _mode: int = 0
+    
+            if _mode == 0:    # Human player.
+                play_one_game(_words, _base, _time_limit, [], True, False)
+            elif _mode == 1:  # Human player and checker.
+                play_one_game(_words, _base, _time_limit, [], True, True)
+            elif _mode == 2:  # Auto test.
+                auto_test(_path, _words, _base, _time_limit, _fixed_words)
+            elif _mode == 3:  # Show auto test history.
+                show_history(_path, 1, 100)
         except Exception as e:
             print("ERROR:", e)
