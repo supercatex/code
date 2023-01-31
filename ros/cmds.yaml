@@ -1,0 +1,276 @@
+QnA:
+-   Q: Who's the most handsome person in Canada?
+    A: I think that Justin Trudeau is very handsome.
+    K:
+    -   [handsome, person]
+
+-   Q: How many time zones are there in Canada?
+    A: Canada spans almost 10 million square km and comprises 6 time zones.
+    K:
+    -   [zones, zone]
+
+-   Q: What's the longest street in the world?
+    A: Yonge Street in Ontario is the longest street in the world.
+    K:
+    -   [longest]
+
+-   Q: How long is Yonge Street in Ontario?
+    A: Yonge street is almost 2,000 km, starting at Lake Ontario, and running north to the Minnesota border.
+    K:
+    -   [how]
+    -   [long]
+
+-   Q: What's the name of the bear cub exported from Canada to the London Zoo in 1915?
+    A: The bear cub was named Winnipeg. It inspired the stories of Winnie-the-Pooh.
+    K:
+    -   [london, 1915]
+
+-   Q: Where was the Blackberry Smartphone developed?
+    A: It was developed in Ontario, at Research In Motion's Waterloo offices.
+    K:
+    -   [blackberry, smartphone, developed, develop]
+-   Q: What is the world's largest coin?
+    A: The Big Nickel in Sudbury, Ontario. It is nine meters in diameter.
+    K:
+    -   [largest]
+    -   [coin, corn]
+
+-   Q: In what year was Canada invaded by the USA for the first time?
+    A: The first time that the USA invaded Canada was in 17 75.
+    K:
+    -   [USA]
+    -   [first]
+
+-   Q: What year was Canada invaded by the USA for the second time?
+    A: The USA invaded Canada a second time in 18 12.
+    K:
+    -   [USA]
+    -   [second]
+
+-   Q: What country holds the record for the most gold medals at the Winter Olympics?
+    A: Canada does! With 14 Golds at the 2010 Vancouver Winter Olympics.
+    K:
+    -   [country, record, gold, medals]
+
+-   Q: Who coined the term Beatlemania?
+    A: Sandy Gardiner, a journalist of the Ottawa Journal.
+    K:
+    -   [term, Beatlemania]
+
+-   Q: Why is Canada named Canada?
+    A: French explorers misunderstood the local native word "Kanata", which means village.
+    K:
+    -   [Canada]
+    -   [named, name]
+
+-   Q: When was The Mounted Police formed?
+    A: The Mounted Police was formed in 18 73.
+    K:
+    -   [police]
+    -   [~Canadian]
+
+-   Q: When was The Royal Canadian Mounted Police formed?
+    A: In 19 20, when The Mounted Police merged with the Dominion Police.
+    K:
+    -   [Canadian]
+    -   [police]
+
+-   Q: How big is the RCMP?
+    A: Today, the RCMP has close to 30,000 members.
+    K:
+    -   [RCMP]
+
+-   Q: What else is Montreal called?
+    A: Montreal is often called the City of Saints or the City of a Hundred Bell Towers.
+    K:
+    -   [else, Montreal]
+
+-   Q: Where is The Hotel de Glace located?
+    A: The Hotel de Glace is in Quebec.
+    K:
+    -   [located, locate, location]
+
+-   Q: How many tons of ice are required to build The Hotel de Glace?
+    A: The Hotel de Glace requires about 400 tons of ice.
+    K:
+    -   [ice, required]
+    -   [~snow]
+
+-   Q: How many tons of snow are required to build The Hotel de Glace?
+    A: Every year, 12000 tons of snow are used for The Hotel de Glace.
+    K:
+    -   [snow, required]
+    -   [~ice]
+
+-   Q: Can I visit the Hotel de Glace in summer?
+    A: No. Every summer it melts away, only to be rebuilt the following winter.
+    K:
+    -   [summer, visit]
+
+-   Q: Where is Canada's only desert?
+    A: Canada's only desert is British Columbia.
+    K:
+    -   [where]
+    -   [only]
+
+-   Q: How big is Canada's only desert?
+    A: The British Columbia desert is only 15 miles long.
+    K:
+    -   [big]
+    -   [only]
+
+-   Q: Name 3 famous male Canadians.
+    A: Leonard Cohen, Keanu Reeves, and Jim Carrey.
+    K:
+    -   [male]
+
+-   Q: Name 3 famous female Canadians.
+    A: Celine Dion, Pamela Anderson, and Avril Lavigne.
+    K:
+    -   [female]
+
+-   Q: What's the origin of the Comic Sans font?
+    A: Comic Sans is based on Dave Gibbons' lettering in the Watchmen comic books.
+    K:
+    -   [origin, comic]
+
+-   Q: What is a nanobot?
+    A: The smallest robot possible is called a nanobot.
+    K:
+    -   [what]
+    -   [nanobot, honorable, nano, edible, iRobot, ozobot, ionic bond, logo, notebook,  lullaby, nanobots]
+
+-   Q: How small can a nanobot be?
+    A: A nanobot can be less than one-thousandth of a millimeter.
+    K:
+    -   [small]
+    -   [nanobot, honorable, nano, edible, iRobot, ozobot, ionic bond, logo, notebook,  lullaby, nanobots]
+
+-   Q: Why wasn't Tron nominated for an award by The Motion Picture Academy?
+    A: The Academy thought that Tron cheated by using computers.
+    K:
+    -   [picture, award, motion]
+
+-   Q: Which was the first computer with a hard disk drive?
+    A: The IBM 305 RAMAC.
+    K:
+    -   [which]
+    -   [computer]
+
+-   Q: When was the first computer with a hard disk drive launched?
+    A: The IBM 305 RAMAC was launched in 19 56.
+    K:
+    -   [when]
+    -   [computer]
+
+-   Q: How big was the first hard disk drive?
+    A: The IBM 305 RAMAC hard disk weighed over a ton and stored 5 MB of data.
+    K:
+    -   [big]
+    -   [first]
+
+-   Q: What does CAPTCHA stands for?
+    A: CAPTCHA is an acronym for "Completely Automated Public Turing test to tell Computers and Humans Apart".
+    K:
+    -   [CAPTCHA, stand, stands]
+
+-   Q: What was the first computer bug?
+    A: The first actual computer bug was a dead moth stuck in a Harvard Mark II.
+    K:
+    -   [bug]
+
+-   Q: Name all of the robots on Mars.
+    A: There are four robots on Mars~ Sojourner, Spirit, Opportunity, and Curiosity. Three more crashed on landing.
+    K:
+    -   [name]
+    -   [robots, robot]
+
+-   Q: Who is the world's first android?
+    A: Professor Kevin Warwick uses chips in his arm to operate doors, a robotic hand, and a wheelchair.
+    K:
+    -   [android]
+
+-   Q: What is a Mechanical Knight?
+    A: A robot sketch made by Leonardo DaVinci.
+    K:
+    -   [Mechanical, Knight]
+
+-   Q: What was the first computer in pass the Turing test?
+    A: Some people think it was IBM Watson, but it was Eugene, a computer designed at England's University of Reading.
+    K:
+    -   [turing]
+
+-   Q: What does Moravec's paradox state?
+    A: Moravec's paradox states that a computer can crunch numbers like Bernoulli, but lacks a toddler's motor skills.
+    K:
+    -   [paradox, state]
+
+-   Q: What is the AI knowledge engineering bottle-neck?
+    A: It is when you need to load an AI with enough knowledge to start learning.
+    K:
+    -   [knowledge, bottle, neck]
+
+-   Q: Why is Elon Musk is worried about AIs impact on humanity?
+    A: I don't know. He should worry more about the people's impact on humanity.
+    K:
+    -   [worried, impact]
+
+-   Q: Do you think robots are a threat to humanity?
+    A: No. Humans are the real threat to humanity.
+    K:
+    -   [threat]
+
+-   Q: What is a chatbot?
+    A: A chatbot is an A.I. you put in customer service to avoid paying salaries.
+    K:
+    -   [chatbot]
+
+-   Q: Are self-driving cars safe?
+    A: Yes. Car accidents are product of human misconduct.
+    K:
+    -   [self, driving, cars, car]
+
+-   Q: Who invented the compiler?
+    A: Grace Hoper. She wrote it in her spare time.
+    K:
+    -   [who]
+    -   [compiler]
+
+-   Q: Who created the C Programming Language?
+    A: C was invented by Dennis MacAlistair Ritchie.
+    K:
+    -   [C, see]
+    -   [programming, language]
+
+-   Q: Who created the Python Programming Language?
+    A: Python was invented by Guido van Rossum.
+    K:
+    -   [python]
+    -   [programming, language]
+
+-   Q: Is Mark Zuckerberg a robot?
+    A: Sure. I've never seen him drink water.
+    K:
+    -   [is]
+    -   [robot]
+
+-   Q: Who is the inventor of the Apple I microcomputer?
+    A: My lord and master Steve Wozniak.
+    K:
+    -   [apple]
+
+-   Q: Who is considered to be the first computer programmer?
+    A: Ada Lovelace.
+    K:
+    -   [considered, consider]
+    -   [programmer]
+
+-   Q: Which program do Jedi use to open PDF files?
+    A: Adobe Wan Kenobi.
+    K:
+    -   [PDF]
+
+-   Q: Stop, please, the test has finished
+    A: Ok, I will stop right now
+    K:
+    -   [stop, please, finished]
