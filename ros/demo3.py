@@ -30,18 +30,22 @@ def get_real_xyz(x, y):
         for k in range(1, 15, 1):
             if d == 0 and y - k >= 0:
                 for j in range(x - k, x + k, 1):
+                    if not (0 <= j < w): continue
                     d = depth[y - k][j]
                     if d > 0: break
             if d == 0 and x + k < w:
                 for i in range(y - k, y + k, 1):
+                    if not (0 <= i < h): continue
                     d = depth[i][x + k]
                     if d > 0: break
             if d == 0 and y + k < h:
                 for j in range(x + k, x - k, -1):
+                    if not (0 <= j < w): continue
                     d = depth[y + k][j]
                     if d > 0: break
             if d == 0 and x - k >= 0:
                 for i in range(y + k, y - k, -1):
+                    if not (0 <= i < h): continue
                     d = depth[i][x - k]
                     if d > 0: break
             if d > 0: break    
@@ -122,7 +126,11 @@ if __name__ == "__main__":
                         
                         P = get_real_xyz(x, y)
                         d = calc_distance(A, B, P)
-                        cv2.putText(image, "%d" % d, (x, y), cv2.FONT_HERSHEY_PLAIN, 1.2, (0, 0, 255), 2, cv2.LINE_AA)
+                        cv2.rectangle(image, (x1, y1), (x2, y1 + 20), (200, 200, 200), -1)
+                        cv2.putText(image, "%d" % d, (x1, y1 + 20), cv2.FONT_HERSHEY_PLAIN, 1.2, (0, 0, 255), 1, cv2.LINE_AA)
+
+                        if d < 300:
+                            cv2.rectangle(image, (x1, y1), (x2, y2), (0, 0, 255), 2)
 
         cv2.imshow("image", image)
         key_code = cv2.waitKey(1)
