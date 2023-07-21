@@ -1,6 +1,7 @@
 from pyPS4Controller.controller import Controller
 from jetracer.nvidia_racecar import NvidiaRacecar
 import time
+import threading
 
 car = NvidiaRacecar()
 class MyController(Controller):
@@ -50,4 +51,15 @@ class MyController(Controller):
         
 
 controller = MyController(interface="/dev/input/js0", connecting_using_ds4drv=False)
-controller.listen(timeout=60)
+
+def test():
+    global controller
+    controller.listen(timeout=60)
+
+thread1 = threading.Thread(target=test)
+thread1.setDaemon(False)
+thread1.start()
+
+while True:
+    time.sleep(1)
+    print(car.steering, car.throttle)
