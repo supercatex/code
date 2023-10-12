@@ -19,9 +19,14 @@ class XYDataset(torch.utils.data.Dataset):
         self.random_hflip = random_hflip
 
     def __len__(self):
-        return len(self.annotations)
+        return len(self.annotations) * 2
 
     def __getitem__(self, idx):
+        is_flip = False
+        if idx >= len(self.annotations):
+            idx -= len(self.annotations)
+            is_flip = True
+
         ann = self.annotations[idx]
         image = cv2.imread(ann['image_path'], cv2.IMREAD_COLOR)
         image = PIL.Image.fromarray(image)
@@ -33,7 +38,8 @@ class XYDataset(torch.utils.data.Dataset):
         x = 2.0 * (ann['x'] / width - 0.5)  # -1 left, +1 right
         y = 2.0 * (ann['y'] / height - 0.5)  # -1 top, +1 bottom
 
-        if self.random_hflip and float(np.random.random(1)) > 0.5:
+        # if self.random_hflip and float(np.random.random(1)) > 0.5:
+        if is_flip:
             image = torch.from_numpy(image.numpy()[..., ::-1].copy())
             x = -x
 
