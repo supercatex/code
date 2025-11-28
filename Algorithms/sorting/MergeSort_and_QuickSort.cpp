@@ -21,15 +21,12 @@ void merge_sort(vector<int> &a, int L, int R) {
 
 void quick_sort(vector<int> &a, int L, int R) {
     if (L >= R) return;
-    
-    int k = L;
-    for (int i = L + 1; i <= R; i++)
-        if (a[i] <= a[k])
-            swap(a[i], a[k]);
-            
-    swap(a[L], a[k]);
-    quick_sort(a, L, k - 1);
-    quick_sort(a, k + 1, R);
+    int k = R, j = L;
+    for (int i = L; i < R; i++)
+        if (a[k] > a[i])
+            swap(a[i], a[j++]);
+    quick_sort(a, L, j - 1);
+    quick_sort(a, j + 1, R);
 }
 
 int main()
