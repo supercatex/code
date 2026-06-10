@@ -6,13 +6,27 @@ import random
 import json
 
 
-class PCMS_Piper(object):
-    def __init__(self, port):
-        super().__init__() 
+# https://github.com/agilexrobotics/piper_sdk/blob/master/asserts/V2/INTERFACE_V2.MD
+class KindaPiper(object):
+    L0 = 123.00
+    L1 = 285.00
+    L2 = 255.50
+    L3 =  90.00
+    JOINTS_LIMIT = (
+        (-2.6179, 2.6179),
+        (0.0, 3.14),
+        (-2.967, 0.0),
+        (-1.745, 1.745),
+        (-1.22, 1.22),
+        (-2.09439, 2.09439)
+    )
+
+    def __init__(self, port="can0"):
+        super().__init__()
         self.port = port 
 
-    # https://github.com/agilexrobotics/piper_sdk/blob/master/asserts/V2/INTERFACE_V2.MD#connectport
-    def connect(self):
+    def connect(self, port=None):
+        if port is not None: self.port = port 
         self.piper = C_PiperInterface_V2(self.port)
         self.piper.DisconnectPort()
 
@@ -33,42 +47,23 @@ class PCMS_Piper(object):
     def init(self):
         self.piper.PiperInit()
 
-    def move_check(self, joints):
+    def check_joints(self, joints):
         if len(joints) != 6:
             print("len(joints) should be 6.")
             return -1, []
 
+        JOINTS_LIMIT = self.JOINTS_LIMIT
+        angles = [round(i * 180 / np.pi, 2) for i in joints]
         res = 0
-        if not (-2.6179 <= joints[0] <= 2.6179):
-            print("joint_1 angle problem:", joints[0], joints[0] * 180 / np.pi)
-            joints[0] = max(-2.6179, min(joints[0], 2.6179))
-            res = -2
-        if not 0.0 <= joints[1] <= 3.14:
-            print("joint_2 angle problem:", joints[1], joints[1] * 180 / np.pi)
-            joints[1] = max(0.0, min(joints[1], 3.14))
-            res = -2
-        if not -2.967 <= joints[2] <= 0.0:
-            print("joint_3 angle problem:", joints[2], joints[2] * 180 / np.pi)
-            joints[2] = max(-2.967, min(joints[2], 0.0))
-            res = -2
-        if not -1.745 <= joints[3] <= 1.745:
-            print("joint_4 angle problem:", joints[3], joints[3] * 180 / np.pi)
-            joints[3] = max(-1.745, min(joints[3], 1.745))
-            res = -2
-        if not -1.22 <= joints[4] <= 1.22:
-            print("joint_5 angle problem:", joints[4], joints[4] * 180 / np.pi)
-            joints[4] = max(-1.22, min(joints[4], 1.22))
-            res = -2
-        if not -2.09439 <= joints[5] <= 2.09439:
-            print("joint_6 angle problem:", joints[5], joints[5] * 180 / np.pi)
-            joints[5] = max(-2.09439, min(joints[5], 2.09439))
-            res = -2
+        for i in range(6):
+            if not (JOINTS_LIMIT[i][0] <= joints[i] <= JOINTS_LIMIT[i][1]):
+                print(f"joint_{i+1} angle problem:", joints[i], angles[i])
+                joints[i] = max(JOINTS_LIMIT[i][0], min(joints[i], JOINTS_LIMIT[i][1]))
+                res = -2
         return res, joints
 
-    # https://github.com/agilexrobotics/piper_sdk/blob/master/asserts/V2/INTERFACE_V2.MD#modectrl
-    # https://github.com/agilexrobotics/piper_sdk/blob/master/asserts/V2/INTERFACE_V2.MD#jointctrl
     def move_joint(self, joints, speed=30, wait_util_finish=True):
-        res, joints = self.move_check(joints)
+        res, joints = self.check_joints(joints)
         if res == -1: return -1
         print("move to", [round(i, 2) for i in joints])
 
@@ -82,20 +77,20 @@ class PCMS_Piper(object):
             jx = [js.joint_1, js.joint_2, js.joint_3, js.joint_4, js.joint_5, js.joint_6]
             max_e = np.inf 
             max_e = max([abs(x1 - x2) for x1, x2 in zip(jx, joints)])
-            # print(max_e)
-            if max_e < 500:
+            if max_e < 1000:
                 wait_util_finish = False
         return res
 
     def calc_joints(self, x, y, z, rx, ry, rz):
-        L0 = 123.0
-        L1 = 285.0
-        L2 = 255.0
-        L3 = 90.0
+        L0 = self.L0
+        L1 = self.L1
+        L2 = self.L2
+        L3 = self.L3
 
-        if not L1 + L2 >= (x ** 2 + y ** 2 + z ** 2) ** 0.5 >= 100:
+        if not (L1 + L2) >= (x ** 2 + y ** 2 + z ** 2) ** 0.5 >= 150:
             print("cannot reach that point!", x, y, z)
             return -1, []
+        
 
         c = np.arctan2(z, x)
         x1 = (x * x + z * z) ** 0.5
@@ -109,7 +104,7 @@ class PCMS_Piper(object):
         a = a + np.pi / 2 - 8 * np.pi / 180
         b = b - np.pi + 17.5 * np.pi / 180
 
-        print("angles:", [round(x * 180 / np.pi, 2) for x in [c, a, b]])
+        # print("angles:", [round(x * 180 / np.pi, 2) for x in [c, a, b]])
         x2 = x1 + L3 * np.cos(-(a + b))
         y2 = y1 + L3 * np.sin(-(a + b))
         z2 = z1
@@ -118,22 +113,25 @@ class PCMS_Piper(object):
         y3 = y2 
         z3 = x2 * np.sin(c) + z2 * np.cos(c)
         
-        x4 = x + L3
-        y4 = y
-        z4 = z
+        x4 = x + L3 * np.cos(rz) * np.cos(ry)
+        z4 = z + L3 * np.cos(rx) * np.sin(ry)
+        y4 = y + L3 * np.cos(rx) * np.sin(rz)
+        print(x, y, z, rx, ry, rz)
+        print(x4, y4, z4)
+        # input()
 
         x5 = x1 * np.cos(c) + z1 * np.sin(c)
         y5 = y1 
         z5 = x1 * np.sin(c) + z1 * np.cos(c)
 
-        print("x0:", [round(i, 2) for i in [x, y, z]])
-        print("x1:", [round(i, 2) for i in [x1, y1, z1]])
-        print("x2:", [round(i, 2) for i in [x2, y2, z2]])
-        print("x3:", [round(i, 2) for i in [x3, y3, z3]])
-        print("x4:", [round(i, 2) for i in [x4, y4, z4]])
-        print("x5:", [round(i, 2) for i in [x5, y5, z5]])
-        print("L3:", ((x3 - x) ** 2 + (y3 - y) ** 2 + (z3 - z) ** 2) ** 0.5)
-        print("L4:", ((x4 - x) ** 2 + (y4 - y) ** 2 + (z4 - z) ** 2) ** 0.5)
+        # print("x0:", [round(i, 2) for i in [x, y, z]])
+        # print("x1:", [round(i, 2) for i in [x1, y1, z1]])
+        # print("x2:", [round(i, 2) for i in [x2, y2, z2]])
+        # print("x3:", [round(i, 2) for i in [x3, y3, z3]])
+        # print("x4:", [round(i, 2) for i in [x4, y4, z4]])
+        # print("x5:", [round(i, 2) for i in [x5, y5, z5]])
+        # print("L3:", ((x3 - x) ** 2 + (y3 - y) ** 2 + (z3 - z) ** 2) ** 0.5)
+        # print("L4:", ((x4 - x) ** 2 + (y4 - y) ** 2 + (z4 - z) ** 2) ** 0.5)
 
         rx = self.calculate_rotation_angle(
             [x5, y5, z5],
@@ -148,14 +146,9 @@ class PCMS_Piper(object):
         if abs(rx - np.pi) < abs(rx): 
             rx = rx - np.pi
             ry = -ry
-        if z > 0: rx = -rx
-        rz = -rx - 17 * np.pi / 180
+        if z4 > 0: rx = -rx
+        rz = (-rx - 17 * np.pi / 180)
         return 0, [c, a, b, rx, ry, rz]
-
-    def move_point(self, x, y, z, rx, ry, rz, speed=30, wait_util_finish=True):
-        res, joints = self.calc_joints(x, y, z, rx, ry, rz)
-        return self.move_joint(joints, speed, wait_util_finish)
-
 
     def calculate_rotation_angle(self, A, B, C):
         O = np.array([0, 0, 0])
@@ -204,10 +197,70 @@ class PCMS_Piper(object):
         cos_B = np.clip(cos_B, -1.0, 1.0)
         return np.arccos(cos_B)
 
+    def move_point(self, x, y, z, rx, ry, rz, speed=30, wait_util_finish=True):
+        res, joints = self.calc_joints(x, y, z, rx, ry, rz)
+        # print(joints)
+        return self.move_joint(joints, speed, wait_util_finish)
+
+    def mdh_matrix(self, alpha_prev, a_prev, d_i, theta_i):
+        ct = np.cos(theta_i)
+        st = np.sin(theta_i)
+        ca = np.cos(alpha_prev)
+        sa = np.sin(alpha_prev)
+        
+        return np.array([
+            [ct,        -st,         0,   a_prev],
+            [st * ca,    ct * ca,   -sa,  -sa * d_i],
+            [st * sa,    ct * sa,    ca,   ca * d_i],
+            [0,          0,          0,   1]
+        ])
+
+    def forward_kinematics(self, joint_angles):
+        mdh_params = [
+            [0,         0,         self.L0,   0],
+            [-np.pi/2,  0,         0,       -172.22 / 180 * np.pi],
+            [0,         self.L1,   0,       -102.78 / 180 * np.pi],
+            [np.pi/2,   -0.021984, self.L2, 0],
+            [-np.pi/2,  0,         0,       0],
+            [np.pi/2,   0,         self.L3,   0]
+        ]
+
+        joint_radians = [i * np.pi / 180 for i in joint_angles]
+
+        T_base_to_end = np.identity(4)
+        for i in range(6):
+            alpha_prev, a_prev, d_i, offset = mdh_params[i]
+            theta_i = joint_radians[i] + offset
+            T_joint = self.mdh_matrix(alpha_prev, a_prev, d_i, theta_i)
+            T_base_to_end = np.dot(T_base_to_end, T_joint)
+        pos = T_base_to_end[0:3, 3]
+        rot = T_base_to_end[0:3, 0:3]
+        roll, pitch, yaw = self.extract_euler_angles(rot)
+        return pos, (roll, pitch, yaw) 
+
+    def extract_euler_angles(self, R):
+        pitch = np.arctan2(-R[2, 0], np.sqrt(R[0, 0]**2 + R[1, 0]**2))
+        roll = np.arctan2(R[2, 1], R[2, 2])
+        yaw = np.arctan2(R[1, 0], R[0, 0])
+        return roll, pitch, yaw
+
+    def move_to_endpoint(self, x, y, z, rx, ry, rz, speed=30, wait_util_finish=True):
+        x1 = x - self.L3 * np.cos(rz) * np.cos(ry)
+        z1 = z - self.L3 * np.cos(rx) * np.sin(ry)
+        y1 = y - self.L3 * np.cos(rx) * np.sin(rz)
+        print(x1, y1, z1)
+        self.move_point(x1, y1, z1, rx, ry, rz, speed, wait_util_finish)
+        return x, y, z
+
 
 if __name__ == "__main__":
-    piper = PCMS_Piper("can0")
-    piper.connect()
+    piper = KindaPiper()
+    piper.connect("can0")
+
+    piper.move_to_endpoint(200, 50, 100, 0, 0, 0, 50)
+    input()
+    piper.move_to_endpoint(400, 50, 100, 0, 0, 0, 50)
+    input()
 
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
@@ -218,28 +271,41 @@ if __name__ == "__main__":
     ax.set_ylabel('Y Label')
     ax.set_zlabel('Z Label')
 
-    px, py, pz, pc = [0], [0], [0], ["black"]
-    d = 100
-    for x in range(100, 601, d):
-        for y in range(-600, 601, d):
-            for z in range(-600, 601, d):
-                res, joints = piper.cal_joints(x, y, z, 0, 0, 0)
-                res, _ = piper.move_check(joints)
+    px, py, pz, pc, pi = [0], [0], [0], ["black"], [0]
+    d = 20
+    for x in range(250, 551, d):
+        for y in range(-500, 501, d):
+            for z in range(-500, 501, d):
+                res, joints = piper.calc_joints(x, y, z, 0, 0, 0)
+                res, _ = piper.check_joints(joints)
                 
                 if res == 0: 
                     px.append(x); py.append(y); pz.append(z);
                     pc.append("blue")
+                    pi.append(pi[-1] + 1)
                 # elif res == -1: 
                 #     px.append(x); py.append(y); pz.append(z);
                 #     pc.append("red")
+                    # pi.append(pi[-1] + 1)
                 elif res == -2: 
                     px.append(x); py.append(y); pz.append(z);
                     pc.append("yellow")
+                    pi.append(pi[-1] + 1)
     ax.scatter(px, py, pz, s=10, c=pc)
-    plt.show()
+    # plt.show()
 
-
-    piper.move_joint([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-    for x, y, z in zip(px, py, pz):
-        piper.move_point(x, y, z, 0.0, 0.0, 0.0, 50)
-        
+    random.shuffle(pi)
+    # piper.move_joint([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    for i in pi:
+        # piper.move_point(px[i], py[i], pz[i], 0.0, 0.0, -np.pi / 4 * 0, 80)
+        print("TARGET:", px[i], py[i], pz[i])
+        piper.move_to_endpoint(px[i], py[i], pz[i], 0.0, 0, -30*np.pi/180, 50)
+        time.sleep(0.1)
+        # input()
+        # js = piper.piper.GetArmJointMsgs().joint_state
+        # jx = [js.joint_1, js.joint_2, js.joint_3, js.joint_4, js.joint_5, js.joint_6]
+        # jx = [i / 1000 for i in jx]
+        # print(jx)
+        # piper.forward_kinematics(jx)
+        # print(px[i], pz[i], py[i])
+        # input()
