@@ -28,12 +28,14 @@ class KindaPiper(object):
     def connect(self, port=None):
         if port is not None: self.port = port 
         self.piper = C_PiperInterface_V2(self.port)
-        self.piper.DisconnectPort()
+        # self.piper.DisconnectPort()
 
         self.piper.ConnectPort()
         while not self.piper.EnablePiper():
             time.sleep(0.01)
         print(f"Port {self.port} connect success.")
+
+        self.piper.EnableArm(7, 0x02)
 
     def emergency_stop(self):
         self.piper.EmergencyStop(0x01)
@@ -65,14 +67,14 @@ class KindaPiper(object):
     def move_joint(self, joints, speed=30, wait_util_finish=True):
         res, joints = self.check_joints(joints)
         if res == -1: return -1
-        print("move to", [round(i, 2) for i in joints])
+        # print("move to", [round(i, 2) for i in joints])
 
         joints = [round(x * 1000 * 180 / np.pi) for x in joints]
         self.piper.ModeCtrl(0x01, 0x01, speed, 0x00)
         self.piper.JointCtrl(*joints)
 
         while wait_util_finish:
-            time.sleep(0.005)
+            time.sleep(0.01)
             js = self.piper.GetArmJointMsgs().joint_state
             jx = [js.joint_1, js.joint_2, js.joint_3, js.joint_4, js.joint_5, js.joint_6]
             max_e = np.inf 
@@ -91,7 +93,6 @@ class KindaPiper(object):
             print("cannot reach that point!", x, y, z)
             return -1, []
         
-
         c = np.arctan2(z, x)
         x1 = (x * x + z * z) ** 0.5
         if x1 < 0: x1 = -x1
@@ -116,8 +117,8 @@ class KindaPiper(object):
         x4 = x + L3 * np.cos(rz) * np.cos(ry)
         z4 = z + L3 * np.cos(rx) * np.sin(ry)
         y4 = y + L3 * np.cos(rx) * np.sin(rz)
-        print(x, y, z, rx, ry, rz)
-        print(x4, y4, z4)
+        # print(x, y, z, rx, ry, rz)
+        # print(x4, y4, z4)
         # input()
 
         x5 = x1 * np.cos(c) + z1 * np.sin(c)
@@ -147,7 +148,7 @@ class KindaPiper(object):
             rx = rx - np.pi
             ry = -ry
         if z4 > 0: rx = -rx
-        rz = (-rx - 17 * np.pi / 180)
+        rz = -rx + np.sin(c) * 1.0
         return 0, [c, a, b, rx, ry, rz]
 
     def calculate_rotation_angle(self, A, B, C):
@@ -248,19 +249,141 @@ class KindaPiper(object):
         x1 = x - self.L3 * np.cos(rz) * np.cos(ry)
         z1 = z - self.L3 * np.cos(rx) * np.sin(ry)
         y1 = y - self.L3 * np.cos(rx) * np.sin(rz)
-        print(x1, y1, z1)
+        # print(x1, y1, z1)
         self.move_point(x1, y1, z1, rx, ry, rz, speed, wait_util_finish)
         return x, y, z
+
+    def close_gripper(self, gripper=50):
+        gripper *= 1000
+
+        c = 0
+        while True:
+            time.sleep(0.005)
+            msg = self.piper.GetArmGripperMsgs()
+            angle = msg.gripper_state.grippers_angle
+            effort = msg.gripper_state.grippers_effort
+
+            # print(angle, effort)
+            d = gripper - angle
+            if abs(d) < 1000: 
+                print("Gripper POSITION RREAK.")
+                break
+
+            k = round(angle + d * 0.5)
+            if abs(k - gripper) < 1000:
+                k = gripper
+
+            if abs(effort) > 500:
+                c += 1
+            else:
+                c = 0
+            if c > 20:
+                self.piper.GripperCtrl(angle - 100, 0, 0x01, 0x00)
+                print("Gripper EFFORT BREAK.")
+                break
+            self.piper.GripperCtrl(k, 0, 0x01, 0x00)
+
+    def move_point22(self, x, y, z, rx, ry, rz, speed=50):
+        while True:
+            time.sleep(0.005)
+
+            factor = 1000
+            position = [x, y, z, rx, ry, rz]
+            X = round(position[0] * factor)
+            Y = round(position[1] * factor)
+            Z = round(position[2] * factor)
+            RX = round(position[3] * factor)
+            RY = round(position[4] * factor)
+            RZ = round(position[5] * factor)
+            self.piper.MotionCtrl_2(0x01, 0x00, speed, 0x00)
+            self.piper.EndPoseCtrl(X, Y, Z, RX, RY, RZ)
+            time.sleep(0.005)
+            # print(self.piper.GetArmEndPoseMsgs())
+            # print(self.piper.GetArmStatus())
+            status = self.piper.GetArmStatus().arm_status.arm_status
+            # print("S:", status)
+            if status == 0x04:
+                print(f"POSITION({X},{Y},{Z}) ERROR!")
+                # input()
+                break
+
+            end_pose = self.piper.GetArmEndPoseMsgs().end_pose
+            cX = end_pose.X_axis
+            cY = end_pose.Y_axis
+            cZ = end_pose.Z_axis
+            cRX = end_pose.RX_axis
+            cRY = end_pose.RY_axis
+            cRZ = end_pose.RZ_axis
+
+            # print(X, Y, Z)
+            # print(cX, cY, cZ)
+            e1 = ((X - cX) ** 2 + (Y - cY) ** 2 + (Z - cZ) ** 2) ** 0.5
+            # print("E1:", e1)
+            if e1 < 1000:
+                print(f"POSITION({X},{Y},{Z}) OK!")
+                # input()
+                break
+
+    def get_end_pose(self):
+        end_pose = self.piper.GetArmEndPoseMsgs().end_pose
+        cX = end_pose.X_axis
+        cY = end_pose.Y_axis
+        cZ = end_pose.Z_axis
+        cRX = end_pose.RX_axis
+        cRY = end_pose.RY_axis
+        cRZ = end_pose.RZ_axis
+        return [cX, cY, cZ, cRX, cRY, cRZ]
+
+    def calc_error(self, p1, p2):
+        return sum([(i - j) ** 2 for i, j in zip(p1, p2)]) ** 0.5
 
 
 if __name__ == "__main__":
     piper = KindaPiper()
     piper.connect("can0")
 
-    piper.move_to_endpoint(200, 50, 100, 0, 0, 0, 50)
+    piper.move_joint([0, 0, 0, 0, 0, 0], 50)
+
+
+    # piper.piper.GripperTeachingPendantParamConfig(100, 70, 1)
+    # piper.piper.ArmParamEnquiryAndConfig(4)
+
+    # piper.piper.ModeCtrl(0x01, 0x01, 100, 0x00)
+
+    # piper.piper.GripperCtrl(0, 1000, 0x02, 0)
+    # piper.piper.GripperCtrl(0, 1000, 0x01, 0x00)
+    # count = 0
+    # k = 2
+    # while True:
+    #     time.sleep(0.005)
+    #     count = (count + 1) % 1000
+    #     if count == 0:
+    #         if k == 2: 
+    #             k = 6 
+    #         else: 
+    #             k = 2
+
+    #     # piper.piper.ModeCtrl(0x01, 0x02, 100, 0x00)
+    #     piper.piper.GripperCtrl(round(0.01 * 1000 * 1000) * k, 1000, 0x01, 0x00)
+
+    #     print(piper.piper.GetArmGripperMsgs())
+    #     print(piper.piper.GetGripperTeachingPendantParamFeedback())
+    #     print(piper.piper.GetArmGripperCtrl())
+
+    # exit(1)
+
+    piper.close_gripper(70)
+    piper.move_to_endpoint(300, 100, 0, 0, 0, 0, 50)
     input()
-    piper.move_to_endpoint(400, 50, 100, 0, 0, 0, 50)
+    piper.move_to_endpoint(450, 100, 0, 0, 0, 0, 50)
+    piper.close_gripper(5)
     input()
+    piper.move_to_endpoint(450, 200, 0, 0, 0, 0, 50)
+    piper.move_to_endpoint(300, 200, 0, 0, 0, 0, 50)
+    input()
+    piper.move_to_endpoint(450, 100, 0, 0, 0, 0, 50)
+    piper.close_gripper(70)
+    exit(1)
 
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
@@ -272,10 +395,10 @@ if __name__ == "__main__":
     ax.set_zlabel('Z Label')
 
     px, py, pz, pc, pi = [0], [0], [0], ["black"], [0]
-    d = 20
-    for x in range(250, 551, d):
-        for y in range(-500, 501, d):
-            for z in range(-500, 501, d):
+    d = 50
+    for x in range(300, 551, d):
+        for y in range(-600, 601, d):
+            for z in range(-600, 601, d):
                 res, joints = piper.calc_joints(x, y, z, 0, 0, 0)
                 res, _ = piper.check_joints(joints)
                 
@@ -294,13 +417,33 @@ if __name__ == "__main__":
     ax.scatter(px, py, pz, s=10, c=pc)
     # plt.show()
 
-    random.shuffle(pi)
+    # random.shuffle(pi)
     # piper.move_joint([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
     for i in pi:
         # piper.move_point(px[i], py[i], pz[i], 0.0, 0.0, -np.pi / 4 * 0, 80)
         print("TARGET:", px[i], py[i], pz[i])
-        piper.move_to_endpoint(px[i], py[i], pz[i], 0.0, 0, -30*np.pi/180, 50)
+        # piper.move_to_endpoint(px[i], py[i], pz[i], 0.0, 0, -90*np.pi/180, 50)
+        # time.sleep(1)
+        # piper.move_to_endpoint(px[i], py[i], pz[i], 0.0, 0, -60*np.pi/180, 50)
+        # time.sleep(1)
+        # piper.move_to_endpoint(px[i], py[i], pz[i], 0.0, 0, -60*np.pi/180, 50)
+        # time.sleep(1)
+        # piper.move_to_endpoint(px[i], py[i], pz[i], 0.0, 0, -30*np.pi/180, 50)
+        # time.sleep(1)
+
+
+        piper.move_to_endpoint(px[i], py[i], pz[i], 0.0, 0, 0, 80)
         time.sleep(0.1)
+        input()
+        # piper.move_point22(px[i], py[i], pz[i], 0.0, 85, 0.0, 80)
+        # time.sleep(0.1)
+        # input()
+
+
+        # piper.move_to_endpoint(px[i], py[i], pz[i], 0.0, 0, 30*np.pi/180, 50)
+        # time.sleep(1)
+        # piper.move_to_endpoint(px[i], py[i], pz[i], 0.0, 0, 60*np.pi/180, 50)
+        # time.sleep(1)
         # input()
         # js = piper.piper.GetArmJointMsgs().joint_state
         # jx = [js.joint_1, js.joint_2, js.joint_3, js.joint_4, js.joint_5, js.joint_6]
