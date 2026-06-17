@@ -1,0 +1,312 @@
+from piper_sdk import *
+import time 
+import numpy as np
+import random 
+
+
+class PiPER_Arm(object):
+    L01 = 123.00
+    L12 = 285.00
+    L23 = 255.50
+    L34 =  90.00 + 145.00
+    JOINTS_LIMIT = (
+        (-2.6179, 2.6179),
+        (0.0, 3.14),
+        (-2.967, 0.0),
+        (-1.745, 1.745),
+        (-1.22, 1.22),
+        (-2.09439, 2.09439)
+    )
+    GRIPPER_LIMIT = (0, 1)
+
+    def __init__(self, port="can0"):
+        super().__init__()
+
+        self.piper = C_PiperInterface_V2(port)
+        self.piper.ConnectPort()
+        while not self.piper.EnablePiper():
+            time.sleep(0.01)
+        print(f"PiPPER Arm connected to port {port}!")
+
+    def get_joints(self):
+        js = self.piper.GetArmJointMsgs().joint_state
+        jx = [js.joint_1, js.joint_2, js.joint_3, js.joint_4, js.joint_5, js.joint_6]
+        return jx
+
+    def get_end_pose(self):
+        end_pose = self.piper.GetArmEndPoseMsgs().end_pose
+        x = end_pose.X_axis
+        y = end_pose.Y_axis
+        z = end_pose.Z_axis
+        rx = end_pose.RX_axis
+        ry = end_pose.RY_axis
+        rz = end_pose.RZ_axis
+        return [x, y, z, rx, ry, rz]
+
+    def get_gripper_state(self):
+        msg = self.piper.GetArmGripperMsgs()
+        angle = msg.gripper_state.grippers_angle
+        effort = msg.gripper_state.grippers_effort
+        return angle, effort 
+
+    def valid_joints(self, joints):
+        if joints is None or len(joints) != 6: return False 
+        for i in range(6):
+            if not (self.JOINTS_LIMIT[i][0] <= joints[i] <= self.JOINTS_LIMIT[i][1]):
+                return False 
+        return True 
+    
+    def valid_gripper(self, distance):
+        if distance is None: return False 
+        return self.GRIPPER_LIMIT[0] <= distance <= self.GRIPPER_LIMIT[1]
+
+    def clip_joints(self, joints):
+        if joints is None or len(joints) != 6: return False 
+        for i in range(6):
+            joints[i] = max(self.JOINTS_LIMIT[i][0], min(joints[i], self.JOINTS_LIMIT[i][1]))
+        return joints 
+
+    def clip_gripper(self, gripper):
+        if gripper is None: return False 
+        return max(self.GRIPPER_LIMIT[i][0], min(gripper, self.GRIPPER_LIMIT[i][1]))
+
+    def check_joints(self, joints, gripper):
+        if len(joints) != 6:
+            print("len(joints) should be 6.")
+            return -1, []
+
+        JOINTS_LIMIT = self.JOINTS_LIMIT
+        angles = [round(i * 180 / np.pi, 2) for i in joints]
+        res = 0
+        for i in range(6):
+            if not (JOINTS_LIMIT[i][0] <= joints[i] <= JOINTS_LIMIT[i][1]):
+                print(f"joint_{i+1} angle problem:", joints[i], angles[i])
+                joints[i] = max(JOINTS_LIMIT[i][0], min(joints[i], JOINTS_LIMIT[i][1]))
+                res = -2
+
+        if gripper != None:
+            GRIPPER_LIMIT = self.GRIPPER_LIMIT
+            if not (GRIPPER_LIMIT[0] <= gripper <= GRIPPER_LIMIT[1]):
+                print(f"gripper problem:", gripper)
+                gripper = max(GRIPPER_LIMIT[0], min(gripper, GRIPPER_LIMIT[1]))
+        return res, joints, gripper
+
+    def calc_distance(self, p1, p2):
+        return sum([(i - j) ** 2 for i, j in zip(p1, p2)]) ** 0.5
+
+    def set_joints(self, joints, speed=30):
+        if not self.valid_joints(joints):
+            print("JOINTS not valid.", joints)
+            joints = self.clip_joints(joints)
+
+        joints = [round(x * 1000 * 180 / np.pi) for x in joints]
+        self.piper.ModeCtrl(0x01, 0x01, speed, 0x00)
+        time.sleep(0.005)
+        self.piper.JointCtrl(*joints)
+
+        e = self.calc_distance(joints, self.get_joints())
+        return e > 1000
+
+    def set_gripper(self, distance, effort=500, delay=1.0):
+        if not self.valid_gripper(distance):
+            print("GRIPPER not valid.", distance)
+            distance = self.clip_gripper(distance)
+
+        distance = abs(round(distance * 100 * 1000))
+        self.piper.GripperCtrl(distance, effort, 0x01, 0x00)
+        time.sleep(delay)
+
+        state = self.get_gripper_state()
+        e = self.calc_distance([distance], [state[0]])
+        return e > 1000 and abs(state[1]) < effort
+
+    def set_end_pose(self, x, y, z, rx, ry, rz, speed=50):
+        position = [x, y, z, rx, ry, rz]
+        position = [i * 1000 for i in position]
+
+        self.piper.ModeCtrl(0x01, 0x00, speed, 0x00)
+        time.sleep(0.005)
+        self.piper.EndPoseCtrl(*position)
+
+        status = self.piper.GetArmStatus().arm_status.arm_status
+        if status == 0x04:
+            return False
+        return True 
+
+    def calc_joints(self, x0, y0, z0, rx, ry, rz):
+        L01 = self.L01
+        L12 = self.L12
+        L23 = self.L23
+        L34 = self.L34
+
+        x1 = x0 - L34 * np.cos(ry) * np.cos(rz) 
+        y1 = y0 - L34 * np.cos(ry) * np.sin(rz)
+        z1 = z0 - L34 * np.sin(ry)
+        
+        c = np.arctan2(y1, x1)
+        x2 = (x1 ** 2 + y1 ** 2) ** 0.5
+        y2 = 0
+        z2 = z1
+
+        print(x0, y0, z0)
+        print(x1, y1, z1)
+        print(x2, y2, z2)
+        if not (L12 + L23) >= (x2 ** 2 + z2 ** 2) ** 0.5 >= 150:
+            print("cannot reach that point!", x0, y0, z0)
+            return []
+        
+        Lk = (x2 ** 2 + z2 ** 2) ** 0.5
+        b = np.pi - np.arccos((L12 ** 2 + L23 ** 2 - Lk ** 2) / (2 * L12 * L23))
+        a = np.pi / 2 - np.arctan2(z2, x2) - np.arccos((L12 ** 2 + Lk ** 2 - L23 ** 2) / (2 * L12 * Lk))
+        a = a + np.pi / 2 - 8 * np.pi / 180
+        b = b - np.pi + 17.5 * np.pi / 180
+
+        R1 = rpy_to_rotation_matrix([0, 0, c])
+        R2 = rpy_to_rotation_matrix([0, a, 0])
+        R3 = rpy_to_rotation_matrix([0, b, 0])
+        R_total = R1 @ R2 @ R3
+        rpy = rotation_matrix_to_rpy(R_total)
+
+        rpy = rpy_to_rotation_matrix([rx, ry, rz]) @ np.linalg.inv(R_total)
+        rpy = rotation_matrix_to_rpy(rpy)
+        # R_curr = rpy_to_rotation_matrix(rpy)
+        # R_targ = rpy_to_rotation_matrix([rx, ry, rz])
+        # R_rel = R_curr.T @ R_targ
+        # # R_rel = R_targ @ R_curr.T
+        # rpy = rotation_matrix_to_rpy(R_rel)
+        print(rpy[1], -a-b-ry)
+        print(np.linalg.inv(R_total) @ R_total)
+
+        R_test = get_zyz_matrix(rx, ry, rz)
+        solutions = solve_6dof_wrist_zyz(R_test)
+        print(solutions)
+        rpy = [x * np.pi / 180 for x in solutions['solution_1']]
+        rpy[1] = -rpy[1]
+        return [c, a, b, *rpy]
+
+
+def rpy_to_rotation_matrix(rpy):
+    """將 (roll, pitch, yaw) 轉為旋轉矩陣 (Z-Y-X 順序)"""
+    r, p, y = rpy
+    
+    Rx = np.array([
+        [1, 0, 0],
+        [0, np.cos(r), -np.sin(r)],
+        [0, np.sin(r), np.cos(r)]
+    ])
+    Ry = np.array([
+        [np.cos(p), 0, np.sin(p)],
+        [0, 1, 0],
+        [-np.sin(p), 0, np.cos(p)]
+    ])
+    Rz = np.array([
+        [np.cos(y), -np.sin(y), 0],
+        [np.sin(y), np.cos(y), 0],
+        [0, 0, 1]
+    ])
+    
+    # 航太標準順序：R = Rz * Ry * Rx
+    return Rz @ Ry @ Rx
+
+def rotation_matrix_to_rpy(R):
+    """將 3x3 旋轉矩陣反解為 (roll, pitch, yaw)"""
+    # Pitch
+    p = np.arctan2(-R[2, 0], np.sqrt(R[0, 0]**2 + R[1, 0]**2))
+    
+    # 檢查奇異點（Gimbal Lock 萬向鎖現象，當 Pitch 接近 +-90 度時）
+    if np.abs(np.cos(p)) < 1e-6:
+        # 當 Pitch = 90° 或 -90° 時，Roll 與 Yaw 會共面
+        r = 0.0
+        y = np.arctan2(-R[0, 1], R[1, 1])
+    else:
+        r = np.arctan2(R[2, 1], R[2, 2])
+        y = np.arctan2(R[1, 0], R[0, 0])
+        
+    return np.array([r, p, y])
+
+def solve_6dof_wrist_zyz(R_wrist):
+    """
+    針對 6DOF 手腕 (Z-Y-Z 構型，如 J4-J5-J6) 反解關節歐拉角
+    :param R_wrist: 3x3 旋轉矩陣 (numpy array)
+    :return: dict 包含兩種可能的關節角度組合 (theta4, theta5, theta6) 單位：度
+    """
+    # 提取矩陣元素
+    r11, r12, r13 = R_wrist[0, 0], R_wrist[0, 1], R_wrist[0, 2]
+    r21, r22, r23 = R_wrist[1, 0], R_wrist[1, 1], R_wrist[1, 2]
+    r31, r32, r33 = R_wrist[2, 0], R_wrist[2, 1], R_wrist[2, 2]
+    
+    # 檢查是否遭遇奇異點 (Singularity / Gimbal Lock)
+    # 當 J5 關節接近 0 度或 180 度時
+    sin_theta5_sq = r31**2 + r32**2
+    
+    if sin_theta5_sq < 1e-6:
+        print("⚠️ 觸發手腕奇異點 (Wrist Singularity)！J4 與 J6 軸平行。")
+        # 遭遇奇異點時，令 theta4 = 0
+        t4 = 0.0
+        if r33 > 0: # theta5 = 0
+            t5 = 0.0
+            t6 = np.arctan2(r21, r11)
+        else: # theta5 = 180 度
+            t5 = np.pi
+            t6 = np.arctan2(-r21, r11)
+            
+        return {
+            "solution_1": np.degrees([t4, t5, t6]),
+            "solution_2": None
+        }
+        
+    # 一般情況：存在正反兩組解 (Wrist Up / Wrist Down)
+    # 解法一 (正弦值為正)
+    t5_1 = np.arctan2(np.sqrt(sin_theta5_sq), r33)
+    t4_1 = np.arctan2(r23, r13)
+    t6_1 = np.arctan2(r32, -r31)
+    
+    # 解法二 (正弦值為負)
+    t5_2 = np.arctan2(-np.sqrt(sin_theta5_sq), r33)
+    t4_2 = np.arctan2(-r23, -r13)
+    t6_2 = np.arctan2(-r32, r31)
+    
+    return {
+        "solution_1": np.degrees([t4_1, t5_1, t6_1]),
+        "solution_2": np.degrees([t4_2, t5_2, t6_2])
+    }
+
+def get_zyz_matrix(t4, t5, t6):
+    R4 = np.array([[np.cos(t4), -np.sin(t4), 0], [np.sin(t4), np.cos(t4), 0], [0, 0, 1]])
+    R5 = np.array([[np.cos(t5), 0, np.sin(t5)], [0, 1, 0], [-np.sin(t5), 0, np.cos(t5)]])
+    R6 = np.array([[np.cos(t6), -np.sin(t6), 0], [np.sin(t6), np.cos(t6), 0], [0, 0, 1]])
+    return R4 @ R5 @ R6
+
+
+if __name__ == "__main__":
+    arm = PiPER_Arm()
+    arm.move_joint([0, 0, 0, 0, 0, 0], 10, 30)
+    # arm.open_gripper()
+
+
+    arm.move_point(500, 100, -50, 0, 85, 0)
+    # arm.move_point(500, 100, 0, 0, 85, 0)
+    # arm.move_point(500, 100, -100, 0, 85, 0)
+    arm.move_point(450, 100, -150, 0, 85, 0)
+
+    # px, py, pz, pi = [0], [0], [0], [0]
+    # d = 50
+    # for x in range(200, 551, d):
+    #     for z in range(-600, 601, d):
+    #         for y in range(-600, 601, d):
+    #             px.append(x); py.append(y); pz.append(z);
+    #             pi.append(pi[-1] + 1)
+    # # random.shuffle(pi)
+
+    # for i in pi:
+    #     # arm.close_gripper(70)
+    #     # time.sleep(1)
+
+    #     arm.move_point(px[i], py[i], pz[i], 0, 85, 0)
+    #     time.sleep(0.05)
+    #     # input()
+
+    #     # arm.close_gripper(40)
+    #     # time.sleep(1)
+    # print("END")
+
