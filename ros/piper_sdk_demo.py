@@ -339,6 +339,8 @@ class KindaPiper(object):
 
 
 if __name__ == "__main__":
+    # bash ./pyAgxArm/pyAgxArm/scripts/ubuntu/can_activate.sh can0 1000000
+    
     piper = KindaPiper()
     piper.connect("can0")
 
