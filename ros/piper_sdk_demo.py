@@ -20,6 +20,7 @@ class KindaPiper(object):
         (-1.22, 1.22),
         (-2.09439, 2.09439)
     )
+    GRIPPER_LIMIT = (0, 1)
 
     def __init__(self, port="can0"):
         super().__init__()
@@ -337,14 +338,58 @@ class KindaPiper(object):
     def calc_error(self, p1, p2):
         return sum([(i - j) ** 2 for i, j in zip(p1, p2)]) ** 0.5
 
+    def set_gripper(self, distance, effort=500, delay=1.0):
+        if not self.valid_gripper(distance):
+            print("GRIPPER not valid.", distance)
+            distance = self.clip_gripper(distance)
+
+        distance = abs(round(distance * 100 * 1000))
+        self.piper.GripperCtrl(distance, effort, 0x01, 0x00)
+        time.sleep(delay)
+
+        state = self.get_gripper_state()
+        e = self.calc_distance([distance], [state[0]])
+        return e > 1000 and abs(state[1]) < effort
+
+    def valid_gripper(self, distance):
+        if distance is None: return False 
+        return self.GRIPPER_LIMIT[0] <= distance <= self.GRIPPER_LIMIT[1]
+
+    def get_joints(self):
+        js = self.piper.GetArmJointMsgs().joint_state
+        jx = [js.joint_1, js.joint_2, js.joint_3, js.joint_4, js.joint_5, js.joint_6]
+        return jx
+
+    def get_end_pose(self):
+        end_pose = self.piper.GetArmEndPoseMsgs().end_pose
+        x = end_pose.X_axis
+        y = end_pose.Y_axis
+        z = end_pose.Z_axis
+        rx = end_pose.RX_axis
+        ry = end_pose.RY_axis
+        rz = end_pose.RZ_axis
+        return [x, y, z, rx, ry, rz]
+
+    def get_gripper_state(self):
+        msg = self.piper.GetArmGripperMsgs()
+        angle = msg.gripper_state.grippers_angle
+        effort = msg.gripper_state.grippers_effort
+        return angle, effort 
+
+    def calc_distance(self, p1, p2):
+        return sum([(i - j) ** 2 for i, j in zip(p1, p2)]) ** 0.5
+
 
 if __name__ == "__main__":
-    # bash ./pyAgxArm/pyAgxArm/scripts/ubuntu/can_activate.sh can0 1000000
-    
     piper = KindaPiper()
     piper.connect("can0")
 
     piper.move_joint([0, 0, 0, 0, 0, 0], 50)
+    piper.move_to_endpoint(100, 300, 0, 0, 0, 0)
+    while True:
+        time.sleep(0.005)
+        print(piper.get_gripper_state())
+    input()
 
 
     # piper.piper.GripperTeachingPendantParamConfig(100, 70, 1)
@@ -374,18 +419,18 @@ if __name__ == "__main__":
 
     # exit(1)
 
-    piper.close_gripper(70)
-    piper.move_to_endpoint(300, 100, 0, 0, 0, 0, 50)
-    input()
-    piper.move_to_endpoint(450, 100, 0, 0, 0, 0, 50)
-    piper.close_gripper(5)
-    input()
-    piper.move_to_endpoint(450, 200, 0, 0, 0, 0, 50)
-    piper.move_to_endpoint(300, 200, 0, 0, 0, 0, 50)
-    input()
-    piper.move_to_endpoint(450, 100, 0, 0, 0, 0, 50)
-    piper.close_gripper(70)
-    exit(1)
+    # piper.close_gripper(70)
+    # piper.move_to_endpoint(300, 100, 0, 0, 0, 0, 50)
+    # input()
+    # piper.move_to_endpoint(450, 100a, 0, 0, 0, 0, 50)
+    # piper.close_gripper(5)
+    # input()
+    # piper.move_to_endpoint(450, 200, 0, 0, 0, 0, 50)
+    # piper.move_to_endpoint(300, 200, 0, 0, 0, 0, 50)
+    # input()
+    # piper.move_to_endpoint(450, 100, 0, 0, 0, 0, 50)
+    # piper.close_gripper(70)
+    # exit(1)
 
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
@@ -398,10 +443,10 @@ if __name__ == "__main__":
 
     px, py, pz, pc, pi = [0], [0], [0], ["black"], [0]
     d = 50
-    for x in range(300, 551, d):
+    for x in range(400, 551, d):
         for y in range(-600, 601, d):
             for z in range(-600, 601, d):
-                res, joints = piper.calc_joints(x, y, z, 0, 0, 0)
+                res, joints = piper.calc_joints(x, y, z, 0, np.pi / 2, 0)
                 res, _ = piper.check_joints(joints)
                 
                 if res == 0: 
@@ -434,9 +479,10 @@ if __name__ == "__main__":
         # time.sleep(1)
 
 
-        piper.move_to_endpoint(px[i], py[i], pz[i], 0.0, 0, 0, 80)
-        time.sleep(0.1)
-        input()
+        piper.move_to_endpoint(px[i], py[i], pz[i], 0.0, 0.0, -np.pi/2, 50)
+        piper.set_gripper(1)
+        piper.set_gripper(0)
+
         # piper.move_point22(px[i], py[i], pz[i], 0.0, 85, 0.0, 80)
         # time.sleep(0.1)
         # input()
