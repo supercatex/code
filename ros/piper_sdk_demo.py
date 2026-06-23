@@ -313,7 +313,7 @@ class KindaPiper(object):
         y = end_pose.Y_axis / 1000
         z = end_pose.Z_axis / 1000 - self.L0
         rx = end_pose.RX_axis / 1000
-        ry = end_pose.RY_axis / 1000
+        ry = end_pose.RY_axis / 1000 - 90
         rz = end_pose.RZ_axis / 1000
         return [x, z, y, rx, rz, ry]
 
@@ -344,12 +344,12 @@ if __name__ == "__main__":
     print(piper.get_end_pose())
     input()
 
-    piper.move_to_endpoint2(500, -20, 130, 0, 0, 0, n=100)
+    piper.move_to_endpoint2(500, -20, 130, 0, 0, 0, speed=30, n=10)
     print(piper.get_gripper_state())
     print(piper.get_end_pose())
     input()
 
-    piper.move_to_endpoint2(500, 300, 130, 0, 0, 0, n=100)
+    piper.move_to_endpoint2(500, 300, 130, 0, 0, 0, speed=30, n=10)
     print(piper.get_gripper_state())
     print(piper.get_end_pose())
     input()
@@ -367,12 +367,12 @@ if __name__ == "__main__":
     print(piper.get_end_pose())
     input()
 
-    piper.move_to_endpoint2(350, -100, 50, 0, 0, -np.pi/2, n=100)
+    piper.move_to_endpoint2(350, -100, 50, 0, 0, -np.pi/2, speed=30, n=1)
     print(piper.get_gripper_state())
     print(piper.get_end_pose())
     input()
 
-    piper.move_to_endpoint2(350, 100, 50, 0, 0, -np.pi/2, n=100)
+    piper.move_to_endpoint2(350, 100, 50, 0, 0, -np.pi/2, speed=30, n=1)
     print(piper.get_gripper_state())
     print(piper.get_end_pose())
     input()
