@@ -10,6 +10,12 @@ import numpy as np
 from rclpy.qos import QoSProfile, \
     QoSReliabilityPolicy, QoSDurabilityPolicy, \
     qos_profile_sensor_data
+from xarm_sdk import XARM_manager, TopicPublisher, ParamConfiger
+from xarm_sdk.utils import *
+from geometry_msgs.msg import Pose
+import time 
+from bodyctrl_msgs.srv import SetAngleFlexible, SetForce, SetGestureForceCalibration
+from lyre_msgs.srv import PlayText 
 
 
 class MotorStatus(object):
@@ -50,6 +56,30 @@ class MotorStatus(object):
     current: {self.current}
     temperature: {self.temperature}
     error: {self.error}
+'''
+
+class JointState(object):
+    def __init__(self, msg=None):
+        self.msg = msg          # RAW data
+        self.name = []
+        self.position = []
+        self.velocity = []
+        self.effort = []
+        self.update(msg)
+
+    def update(self, msg):
+        if msg is None: return
+        self.name = msg.name 
+        self.position = msg.position 
+        self.velocity = msg.velocity
+        self.effort = msg.effort
+
+    def __str__(self):
+        return f'''JointState:
+    name: {self.name}
+    position: {self.position}
+    velocity: {self.velocity}
+    effort: {self.effort}
 '''
 
 class RPY_Position(object):
@@ -100,7 +130,7 @@ class WaistStatus(object):
             self.motors[i].update(msg.status[i])
     
     def __str__(self):
-        return f"{self.motors[0]}{self.motors[1]}"
+        return "".join([str(x) for x in self.motors])
 
 class LegStatus(object):
     # -13 ~ + 80 [51] Hip Pitch
@@ -117,7 +147,139 @@ class LegStatus(object):
             self.motors[i].update(msg.status[i])
 
     def __str__(self):
-        return f"{self.motors[0]}{self.motors[1]}"
+        return "".join([str(x) for x in self.motors])
+
+class HandStatus(object):
+    def __init__(self, msg=None):
+        self.msg = msg 
+        self.motors: list[MotorStatus] = []
+        for i in range(6): self.motors.append(MotorStatus())
+        self.update(msg)
+    
+    def update(self, msg):
+        if msg is None: return 
+        for i in range(6):
+            self.motors[i].update(msg.status[i])
+
+    def __str__(self):
+        return "".join([str(x) for x in self.motors])
+    
+
+class XarmHandler(object):
+    def __init__(self):
+        self.xarm = XARM_manager()
+        self.deactivate()
+        self.topic_publisher = TopicPublisher(self.xarm)
+
+        param_configer = ParamConfiger(self.xarm)
+        param_configer.set_node_parameter("endpose_single_arm_qp_L_controller", "dis_err_bound", 10.0)
+        param_configer.set_node_parameter("endpose_single_arm_qp_L_controller", "ori_err_bound", 3.0)
+        param_configer.set_node_parameter("endpose_single_arm_qp_L_controller", "otg_p_step", 0.002)
+        param_configer.set_node_parameter("endpose_single_arm_qp_L_controller", "otg_r_step", 0.002)
+
+        param_configer.set_node_parameter("endpose_single_arm_qp_R_controller", "dis_err_bound", 10.0)
+        param_configer.set_node_parameter("endpose_single_arm_qp_R_controller", "ori_err_bound", 3.0)
+        param_configer.set_node_parameter("endpose_single_arm_qp_R_controller", "otg_p_step", 0.002)
+        param_configer.set_node_parameter("endpose_single_arm_qp_R_controller", "otg_r_step", 0.002)
+
+        param_configer.set_node_parameter("endpose_dual_arm_qp_controller", "dis_err_bound", 10.0)
+        param_configer.set_node_parameter("endpose_dual_arm_qp_controller", "ori_err_bound", 3.0)
+        param_configer.set_node_parameter("endpose_dual_arm_qp_controller", "otg_p_step", 0.002)
+        param_configer.set_node_parameter("endpose_dual_arm_qp_controller", "otg_r_step", 0.002)
+        self.activate()
+
+    def activate(self):
+        self.xarm.hardware_arm_enable(True)
+
+    def deactivate(self):
+        self.xarm.hardware_all_enable(False)
+        self.xarm.xarm_deactivate_all_controller()
+        self.xarm.get_logger().info("deactivate all controller.")
+
+    def set_endpose_L(self, xyz, rpy, deg=False, delay=3.0):
+        x, y, z = xyz 
+        if deg: rpy = np.deg2rad(rpy)
+
+        msg_pose = Pose()
+        # # 设置左臂初始位置（单位：米）
+        msg_pose.position.x = x
+        msg_pose.position.y = y
+        msg_pose.position.z = z
+
+        q = euler_to_quaternion(*rpy)
+        msg_pose.orientation.x = q[0]
+        msg_pose.orientation.y = q[1]
+        msg_pose.orientation.z = q[2]
+        msg_pose.orientation.w = q[3]
+
+        self.xarm.activate_controller("endpose_single_arm_qp_L_controller")
+        self.topic_publisher.publish_endposetarget_L(msg_pose, from_frame="waist_yaw_link")
+        time.sleep(delay)
+        self.xarm.xarm_deactivate_all_controller()
+    
+    def set_endpose_R(self, xyz, rpy, deg=False, delay=3.0):
+        x, y, z = xyz 
+        if deg: rpy = np.deg2rad(rpy)
+
+        msg_pose = Pose()
+        # # 设置左臂初始位置（单位：米）
+        msg_pose.position.x = x
+        msg_pose.position.y = y
+        msg_pose.position.z = z
+
+        q = euler_to_quaternion(*rpy)
+        msg_pose.orientation.x = q[0]
+        msg_pose.orientation.y = q[1]
+        msg_pose.orientation.z = q[2]
+        msg_pose.orientation.w = q[3]
+
+        self.xarm.activate_controller("endpose_single_arm_qp_R_controller")
+        self.topic_publisher.publish_endposetarget_R(msg_pose, from_frame="waist_yaw_link")
+        time.sleep(delay)
+        self.xarm.xarm_deactivate_all_controller()
+
+    def set_endpose_LR(self, xyz_L, rpy_L, xyz_R, rpy_R, deg=False, delay=3.0):
+        x1, y1, z1 = xyz_L
+        if deg: rpy_L = np.deg2rad(rpy_L)
+        x2, y2, z2 = xyz_R 
+        if deg: rpy_R = np.deg2rad(rpy_R)
+
+        msg_pose1 = Pose()
+        # # 设置左臂初始位置（单位：米）
+        msg_pose1.position.x = x1
+        msg_pose1.position.y = y1
+        msg_pose1.position.z = z1
+
+        q = euler_to_quaternion(*rpy_L)
+        msg_pose1.orientation.x = q[0]
+        msg_pose1.orientation.y = q[1]
+        msg_pose1.orientation.z = q[2]
+        msg_pose1.orientation.w = q[3]
+
+        msg_pose2 = Pose()
+        # # 设置左臂初始位置（单位：米）
+        msg_pose2.position.x = x2
+        msg_pose2.position.y = y2
+        msg_pose2.position.z = z2
+
+        q = euler_to_quaternion(*rpy_R)
+        msg_pose2.orientation.x = q[0]
+        msg_pose2.orientation.y = q[1]
+        msg_pose2.orientation.z = q[2]
+        msg_pose2.orientation.w = q[3]
+
+        self.xarm.xarm_deactivate_all_controller()
+        self.xarm.activate_controller("endpose_dual_arm_qp_controller")
+        self.topic_publisher.publish_endposetarget_dual(msg_pose1, msg_pose2, from_frame_l="waist_yaw_link", from_frame_r="waist_yaw_link")
+        time.sleep(delay)
+
+    def set_arm_joints(self, pos_L, pos_R, delay=5.0):
+        self.xarm.xarm_deactivate_all_controller()
+        self.xarm.activate_controller("jointspace_arm_L_controller")
+        self.xarm.activate_controller("jointspace_arm_R_controller")
+        self.topic_publisher.publish_jointspace_commands_L(pos_L)
+        self.topic_publisher.publish_jointspace_commands_R(pos_R)
+        time.sleep(delay)
 
 
 class X_Humanoid(object):
@@ -147,8 +309,8 @@ class X_Humanoid(object):
         )
 
         self.cb = CvBridge()
-        self.head_image = None 
-        self.head_depth = None
+        self.head_image = None #np.zeros((768, 1280, 3), dtype=np.uint8) 
+        self.head_depth = None #np.zeros((768, 1280, 3), dtype=np.float32) 
         self.node.create_subscription(
             Image, "/ob_camera_head/color/image_raw",
             self.callback_head_image,
@@ -173,6 +335,15 @@ class X_Humanoid(object):
             self.callback_leg_status, 10
         )
 
+        self.set_angle_left_hand = self.node.create_client(SetAngleFlexible, "/inspire_hand/set_angle_flexible/left_hand")
+        self.set_angle_right_hand = self.node.create_client(SetAngleFlexible, "/inspire_hand/set_angle_flexible/right_hand")
+        self.set_force_left_hand = self.node.create_client(SetForce, "/inspire_hand/set_force/left_hand")
+        self.set_force_right_hand = self.node.create_client(SetForce, "/inspire_hand/set_force/right_hand")
+        self.set_gesture_force_calibration_L = self.node.create_client(SetGestureForceCalibration, "/inspire_hand/set_gesture_force_calibration/left_hand")
+        self.set_gesture_force_calibration_R = self.node.create_client(SetGestureForceCalibration, "/inspire_hand/set_gesture_force_calibration/right_hand")
+        self.play_text = self.node.create_client(PlayText, "/audio_play/play_text")
+        self.arm = XarmHandler()
+
     def callback_head_status(self, msg):
         self.head_status.update(msg)
 
@@ -186,6 +357,7 @@ class X_Humanoid(object):
         self.waist_status.update(msg)
 
     def callback_leg_status(self, msg):
+        print("LEG update")
         self.leg_status.update(msg)
 
     def check_head(self):
@@ -208,12 +380,16 @@ class X_Humanoid(object):
         msg.cur = cur 
         return msg 
 
-    def set_head_pos(self, x, y, z):
+    def set_head_pos(self, rpy, deg=False, delay=3.0):
+        if deg: rpy = np.deg2rad(rpy)
+        x, y, z = rpy
+
         msg = CmdSetMotorPosition()
-        msg.cmds.append(self.create_SetMotorPosition(1, x, 0.5, 0.5))
-        msg.cmds.append(self.create_SetMotorPosition(2, y, 0.5, 0.5))
-        msg.cmds.append(self.create_SetMotorPosition(3, z, 0.5, 0.5))
+        msg.cmds.append(self.create_SetMotorPosition(1, x, 1.0, 0.5))
+        msg.cmds.append(self.create_SetMotorPosition(2, y, 1.0, 0.5))
+        msg.cmds.append(self.create_SetMotorPosition(3, z, 1.0, 0.5))
         self.head_cmd_pos.publish(msg)
+        time.sleep(delay)
 
     def set_head_vel(self, x, y, z):
         msg = CmdSetMotorSpeed()
@@ -224,42 +400,96 @@ class X_Humanoid(object):
 
     def set_waist_pos(self, p1, p2):
         msg = CmdSetMotorPosition()
-        msg.cmds.append(self.create_SetMotorPosition(31, p1, 0.1, 0.5))
-        msg.cmds.append(self.create_SetMotorPosition(32, p2, 0.1, 0.5))
+        msg.cmds.append(self.create_SetMotorPosition(31, p1, 0.3, 0.5))
+        msg.cmds.append(self.create_SetMotorPosition(32, p2, 0.3, 0.5))
         self.waist_cmd_pos.publish(msg)
 
     def set_leg_pos(self, p1, p2):
         msg = CmdSetMotorPosition()
-        msg.cmds.append(self.create_SetMotorPosition(51, p1, 0.1, 0.5))
-        msg.cmds.append(self.create_SetMotorPosition(52, p2, 0.1, 0.5))
+        msg.cmds.append(self.create_SetMotorPosition(51, p1, 0.3, 0.5))
+        msg.cmds.append(self.create_SetMotorPosition(52, p2, 0.3, 0.5))
         self.leg_cmd_pos.publish(msg)
 
-    def set_height(self, h):
+    def set_height(self, h, delay=5.0):
         L = 240
         h = max(150, min(h, 450))
         a = np.deg2rad(60) - np.arccos(h / 2 / L)
 
-        m31, m32 = [x.pos for x in self.waist_status.motors]
-        m51, m52 = [x.pos for x in self.leg_status.motors]
-        e = ((m32 - a) ** 2 + (m51 + a) ** 2 + (m52 - a) ** 2) ** 0.5
-        if e < 0.01: return False 
-
-        self.set_waist_pos(m31, a)
+        self.set_waist_pos(self.waist_status.motors[0].pos, a)
         self.set_leg_pos(-a, a)
-        return True
+        time.sleep(delay)
     
     def get_height(self):
         L = 240
         a = np.deg2rad(60) - self.leg_status.motors[1].pos
         h = np.cos(a) * L * 2
         return h
+
+    def set_arm_home_pose(self, delay=5.0):
+        pos_L = [0.64, -0.15, 0.0, -1.31, 0.0, -0.48, -0.35]
+        pos_R = [0.64, 0.15, 0.0, -1.31, 0.0, -0.48, 0.35]
+        self.arm.set_arm_joints(pos_L, pos_R, delay)
     
+    def set_left_hand(self, angle1, angle2, angle3, force=0.1, delay=3.0):
+        request = SetForce.Request()
+        request.force0_ratio = force
+        request.force1_ratio = force
+        request.force2_ratio = force 
+        request.force3_ratio = force 
+        request.force4_ratio = force 
+        request.force5_ratio = force 
+        self.set_force_left_hand.call_async(request)
+
+        request = SetAngleFlexible.Request()
+        request.name = ["1", "2", "3", "4", "5", "6"]
+        request.angle_ratio = [angle1, angle1, angle1, angle1, angle2, angle3]
+        self.set_angle_left_hand.call_async(request)
+        time.sleep(delay)
+    
+    def set_right_hand(self, angle1, angle2, angle3, force=0.1, delay=3.0):
+        request = SetForce.Request()
+        request.force0_ratio = force
+        request.force1_ratio = force
+        request.force2_ratio = force 
+        request.force3_ratio = force 
+        request.force4_ratio = force 
+        request.force5_ratio = force 
+        self.set_force_right_hand.call_async(request)
+
+        request = SetAngleFlexible.Request()
+        request.name = ["1", "2", "3", "4", "5", "6"]
+        request.angle_ratio = [angle1, angle1, angle1, angle1, angle2, angle3]
+        self.set_angle_right_hand.call_async(request)
+        time.sleep(delay)
+
+    def check_left_hand(self, delay=10.0):
+        print("Check Left hand.")
+        request = SetGestureForceCalibration.Request()
+        self.set_gesture_force_calibration_L.call_async(request)
+        time.sleep(delay)
+
+    def check_right_hand(self, delay=10.0):
+        print("Check right hand.")
+        request = SetGestureForceCalibration.Request()
+        self.set_gesture_force_calibration_R.call_async(request)
+        time.sleep(delay)
+
+    def say(self, text):
+        request = PlayText.Request()
+        request.text = "Hello World"
+        self.play_text.call_async(request)
+        time.sleep(3)
+
 
 class Main(Node):
     def __init__(self):
         super().__init__("demo")
-        self.timer = self.create_timer(1 / 20, self.callback_timer)
         self.robot = X_Humanoid(self)
+        self.timer = self.create_timer(1 / 20, self.callback_timer)
+
+        self.robot.say("Hello")
+        print("END")
+        time.sleep(100)
 
     def callback_timer(self):
         if not self.robot.check_head(): return 
@@ -268,11 +498,36 @@ class Main(Node):
         # print(self.robot.waist_status)
         # print(self.robot.leg_status)
 
-        # self.robot.set_head_pos(0.0, 0.0, 0.0)
-        # self.robot.set_waist_pos(0 * 3.14 / 180, 26 * 3.14 / 180)
-        # self.robot.set_leg_pos(-26 * 3.14 / 180, 26 * 3.14 / 180)
+
+        self.robot.set_head_pos((0, 25, 0), deg=True)
+        self.robot.set_head_pos((0, 0, 80), deg=True)
+        self.robot.set_head_pos((0, -25, 0), deg=True)
+        self.robot.set_head_pos((0, 0, -80), deg=True)
+        self.robot.set_head_pos((0, 0, 0), deg=True)
+        
+        self.robot.set_height(150)
+        self.robot.set_height(450)
         self.robot.set_height(240)
-        print(self.robot.get_height())
+
+        # self.robot.set_height(300)
+        # self.robot.set_waist_pos(0.0, 0.8)
+        # time.sleep(100)
+
+        self.robot.arm.set_endpose_LR((0.2, 0.4, 0.0), (0.0, -90, 0.0), (0.2, -0.4, 0.0), (0.0, -90, 0.0), deg=True, delay=3.0)
+        # self.robot.arm.xarm.hardware_arm_enable(True)
+
+        self.robot.set_arm_home_pose()
+
+        self.robot.check_left_hand()
+        self.robot.check_right_hand()
+
+        self.robot.set_left_hand(1.0, 1.0, 1.0)
+        self.robot.set_left_hand(1.0, 1.0, 0.0)
+        self.robot.set_left_hand(0.6, 0.3, 0.0)
+
+        self.robot.set_right_hand(1.0, 1.0, 1.0)
+        self.robot.set_right_hand(1.0, 1.0, 0.0)
+        self.robot.set_right_hand(0.6, 0.3, 0.0)
 
         cv2.imshow("frame", self.robot.head_image)
         cv2.imshow("depth", self.robot.head_depth)
@@ -282,12 +537,8 @@ class Main(Node):
     
 
 if __name__ == "__main__":
-    try:
-        rclpy.init()
-        node = Main()
-        rclpy.spin(node)
-    except Exception as e:
-        print("END with", e)
-    finally:
-        node.destroy_node()
-        rclpy.shutdown()
+    rclpy.init()
+    node = Main()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
