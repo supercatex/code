@@ -487,9 +487,11 @@ class Main(Node):
         self.robot = X_Humanoid(self)
         self.timer = self.create_timer(1 / 20, self.callback_timer)
 
-        self.robot.say("Hello")
-        print("END")
-        time.sleep(100)
+        self.robot.arm.deactivate()
+        
+        self.robot.say("我準備好了")
+        # print("END")
+        time.sleep(3)
 
     def callback_timer(self):
         if not self.robot.check_head(): return 
@@ -542,3 +544,4 @@ if __name__ == "__main__":
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
+
