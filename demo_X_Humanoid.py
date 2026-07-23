@@ -15,7 +15,7 @@ from xarm_sdk.utils import *
 from geometry_msgs.msg import Pose
 import time 
 from bodyctrl_msgs.srv import SetAngleFlexible, SetForce, SetGestureForceCalibration
-from lyre_msgs.srv import PlayText 
+from lyre_msgs.srv import PlayText, PlayFile, PlayStop
 import requests
 
 
@@ -502,6 +502,8 @@ class X_Humanoid(object):
         self.set_gesture_force_calibration_L = self.node.create_client(SetGestureForceCalibration, "/inspire_hand/set_gesture_force_calibration/left_hand")
         self.set_gesture_force_calibration_R = self.node.create_client(SetGestureForceCalibration, "/inspire_hand/set_gesture_force_calibration/right_hand")
         self.play_text = self.node.create_client(PlayText, "/audio_play/play_text")
+        self.play_file = self.node.create_client(PlayFile, "/audio_play/play_file")
+        self.play_stop = self.node.create_client(PlayStop, "/audio_play/stop")
         self.arm = XarmHandler()
 
     def callback_head_status(self, msg):
@@ -599,6 +601,9 @@ class X_Humanoid(object):
         self.arm.set_arm_joints(pos_L, pos_R, delay)
 
     def set_home_pose(self, delay=5.0):
+        self.set_head_pos((0.0, 0.0, 0.0), delay=0.0)
+        self.set_left_hand(1.0, 1.0, 1.0, delay=0.0)
+        self.set_right_hand(1.0, 1.0, 1.0, delay=0.0)
         self.set_height(240, delay=0.0)
         self.set_arm_home_pose(delay=delay)
     
@@ -652,16 +657,25 @@ class X_Humanoid(object):
         self.play_text.call_async(request)
         time.sleep(delay)
 
+    def play(self, filepath, delay=5.0):
+        request = PlayFile.Request()
+        request.path = filepath 
+        self.play_file.call_async(request)
+        time.sleep(delay)
+        request = PlayStop.Request()
+        self.play_stop.call_async(request)
+
 
 class Main(Node):
     def __init__(self):
         super().__init__("demo")
         self.robot = X_Humanoid(self)
+
         self.timer = self.create_timer(1 / 20, self.callback_timer)
 
         self.robot.arm.deactivate()
         self.robot.set_home_pose()
-
+        # input()
         self.base = SlamtecNode()
 
         self.robot.say("大家好")
@@ -675,7 +689,7 @@ class Main(Node):
         time.sleep(3)
 
     def callback_timer(self):
-        if not self.robot.check_head(): return 
+        # if not self.robot.check_head(): return 
 
         self.robot.say("正在檢測頭部運動")
         self.robot.set_head_pos((0, 25, 0), deg=True)
@@ -736,6 +750,7 @@ class Main(Node):
                 action_state = self.base.get_action_status(action["action_id"])
                 print(action_state)
                 if action_state["state"]["status"] == 4:
+                    self.robot.play("/home/nvidia/data/speech/sbus/100000.mp3", delay=10)
                     state = 2
             elif state == 2:
                 self.robot.say("正在前往P2")
