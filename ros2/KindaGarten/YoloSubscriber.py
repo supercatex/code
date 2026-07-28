@@ -22,9 +22,9 @@ class YoloSubscriber(Node):
         )
 
     def ok(self)->bool:
-        if self.sub_image.data is None: return False 
-        if self.sub_depth.data is None: return False
-        if self.sub_yolo.data is None: return False 
+        if self.sub_image.data is None: self.get_logger().warn("no image..."); return False 
+        if self.sub_depth.data is None: self.get_logger().warn("no depth..."); return False
+        if self.sub_yolo.data is None: self.get_logger().warn("no yolo data..."); return False 
         return True 
 
     @property
@@ -38,6 +38,34 @@ class YoloSubscriber(Node):
     @property
     def yolo_data(self):
         return self.sub_yolo.data
+
+    def get_binary_mask_by_xy(self, xy):
+        image = self.image.copy()
+        b_mask = np.zeros(image.shape[:2], np.uint8)
+        contour = np.array(xy, dtype=np.int32).reshape(-1, 1, 2)
+        cv2.drawContours(b_mask, [contour], -1, (255, 255, 255), cv2.FILLED)
+        return b_mask
+
+    def draw_mask_by_mask(self, image, b_mask):
+        color3ch = np.zeros(image.shape, dtype=np.uint8)
+        color3ch[:, :, 1] = 255
+        mask3ch = cv2.cvtColor(b_mask, cv2.COLOR_GRAY2BGR)
+        isolated = cv2.bitwise_and(mask3ch, color3ch)
+        cv2.addWeighted(isolated, 0.2, image, 1.0, 0, image)
+        return image 
+
+    def draw_mask_by_xy(self, image, xy):
+        b_mask = self.get_binary_mask_by_xy(xy)
+        return self.draw_mask_by_mask(image, b_mask)
+
+    def get_display_image(self, image, depth):
+        h, w, c = image.shape
+        h, w = h // 2, w // 2
+        heatmap = np.array(depth / np.max(depth) * 255, dtype=np.uint8)
+        heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+        heatmap = cv2.resize(heatmap, (w, h))
+        display = cv2.resize(image, (w, h))
+        return cv2.hconcat([display, heatmap])
 
 
 if __name__ == "__main__":
@@ -53,31 +81,17 @@ if __name__ == "__main__":
         SingleThreadedExecutorInstance().spin_once()
 
         if not node.ok(): print("waiting..."); time.sleep(1); continue
-        image = node.sub_image.data.copy()
-        depth = node.sub_depth.data.copy()
+        image = node.image.copy()
+        depth = node.depth.copy()
 
         for obj in node.yolo_data["obj"]:
             x1, y1, x2, y2 = obj["xyxy"]
             cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
             if "xy" in obj:
-                b_mask = np.zeros(image.shape[:2], np.uint8)
-                contour = np.array(obj["xy"], dtype=np.int32).reshape(-1, 1, 2)
-                cv2.drawContours(b_mask, [contour], -1, (255, 255, 255), cv2.FILLED)
+                image = node.draw_mask_by_xy(image, obj["xy"])
 
-                color3ch = np.zeros(image.shape, dtype=np.uint8)
-                color3ch[:, :, 1] = 255
-                mask3ch = cv2.cvtColor(b_mask, cv2.COLOR_GRAY2BGR)
-                isolated = cv2.bitwise_and(mask3ch, color3ch)
-                cv2.addWeighted(isolated, 0.2, image, 1.0, 0, image)
-
-        h, w, c = image.shape
-        h, w = h // 2, w // 2
-        heatmap = np.array(depth / np.max(depth) * 255, dtype=np.uint8)
-        heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
-        heatmap = cv2.resize(heatmap, (w, h))
-        display = cv2.resize(image, (w, h))
-        cv2.imshow("frame", cv2.hconcat([display, heatmap]))
+        cv2.imshow("frame", node.get_display_image(image, depth))
         key_code = cv2.waitKey(1)
         if key_code in [27, ord('q')]:
             break
