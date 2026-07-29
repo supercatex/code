@@ -54,19 +54,17 @@ def get_real_xyz(x, y, depth, rpy=(0, 0, 0), k = 0):
                 d = depth[y + dy][x + dx]
     x, y = x - w // 2, y - h // 2
     a, b = np.deg2rad(86), np.deg2rad(55)
-    # x / w = real_x / real_w
-    # real_w / 2 / d = tan(a / 2)
     real_x = 2 * d * np.tan(a / 2) * x / w 
     real_y = 2 * d * np.tan(b / 2) * y / h 
-    # real_x = x * d / 620
-    # real_y = y * d / 620
-    real_x, real_y, real_z = d, -real_x, -real_y + 600
+    real_x, real_y, real_z = d, -real_x, -real_y
 
-    rx, ry, rz = rpy
-    ry = np.deg2rad(np.rad2deg(ry) + 21)
-    # print(rpy)
+    # rx, ry, rz = rpy
+    # ry = np.deg2rad(np.rad2deg(ry) + 21)
+    # new_z = (real_x - real_z * np.tan(ry)) * np.sin(ry) + real_z / np.cos(ry)
+    # new_x = real_z * np.tan(ry) * np.cos(ry)
+    # real_x, real_z = new_x, new_z
 
-    return real_x / 1000, real_y / 1000, real_z / 1000
+    return real_x / 1000, real_y / 1000, (real_z + 600) / 1000
 
 
 if __name__ == "__main__":
