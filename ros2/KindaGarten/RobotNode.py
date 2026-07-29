@@ -82,6 +82,9 @@ class RPY_Position(object):
     def __str__(self):
         return f"ROLL: {self.x:.2f}, PITCH: {self.y:.2f}, YAW: {self.z:.2f}"
 
+    def tolist(self):
+        return [self.x, self.y, self.z]
+
 class HeadStatus(object):
     # Kp: 0~2000
     # Kd: 0~300
@@ -92,19 +95,19 @@ class HeadStatus(object):
         self.msg = msg
         self.motors: list[MotorStatus] = []
         for i in range(3): self.motors.append(MotorStatus())
-        self.pos = RPY_Position() 
+        self.rpy = RPY_Position() 
         self.update(msg)
 
     def update(self, msg):
         if msg is None: return
         for i in range(3):
             self.motors[i].update(msg.status[i])
-        self.pos.x = msg.status[0].pos
-        self.pos.y = msg.status[1].pos 
-        self.pos.z = msg.status[2].pos 
+        self.rpy.x = msg.status[0].pos
+        self.rpy.y = msg.status[1].pos 
+        self.rpy.z = msg.status[2].pos 
 
     def __str__(self):
-        return f"{self.pos}\n{self.motors[0]}{self.motors[1]}{self.motors[2]}"
+        return f"{self.rpy}\n{self.motors[0]}{self.motors[1]}{self.motors[2]}"
 
 class WaistStatus(object):
     # -160 ~ +180 [31] Waist Yaw
