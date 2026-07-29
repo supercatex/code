@@ -95,11 +95,15 @@ class HeadStatus(object):
         self.msg = msg
         self.motors: list[MotorStatus] = []
         for i in range(3): self.motors.append(MotorStatus())
+        self.motors_pre: list[MotorStatus] = []
+        for i in range(3): self.motors_pre.append(MotorStatus())
         self.rpy = RPY_Position() 
         self.update(msg)
 
     def update(self, msg):
         if msg is None: return
+        for i in range(3):
+            self.motors_pre[i].update(self.motors[i])
         for i in range(3):
             self.motors[i].update(msg.status[i])
         self.rpy.x = msg.status[0].pos
@@ -116,10 +120,14 @@ class WaistStatus(object):
         self.msg = msg 
         self.motors: list[MotorStatus] = []
         for i in range(2): self.motors.append(MotorStatus())
+        self.motors_pre: list[MotorStatus] = []
+        for i in range(2): self.motors_pre.append(MotorStatus())
         self.update(msg)
     
     def update(self, msg):
         if msg is None: return 
+        for i in range(2):
+            self.motors_pre[i].update(self.motors[i])
         for i in range(2):
             self.motors[i].update(msg.status[i])
     
@@ -133,10 +141,14 @@ class LegStatus(object):
         self.msg = msg 
         self.motors: list[MotorStatus] = []
         for i in range(2): self.motors.append(MotorStatus())
+        self.motors_pre: list[MotorStatus] = []
+        for i in range(2): self.motors_pre.append(MotorStatus())
         self.update(msg)
     
     def update(self, msg):
         if msg is None: return 
+        for i in range(2):
+            self.motors_pre[i].update(self.motors[i])
         for i in range(2):
             self.motors[i].update(msg.status[i])
 
@@ -148,16 +160,39 @@ class HandStatus(object):
         self.msg = msg 
         self.motors: list[MotorStatus] = []
         for i in range(6): self.motors.append(MotorStatus())
+        self.motors_pre: list[MotorStatus] = []
+        for i in range(6): self.motors_pre.append(MotorStatus())
         self.update(msg)
     
     def update(self, msg):
         if msg is None: return 
         for i in range(6):
+            self.motors_pre[i].update(self.motors[i])
+        for i in range(6):
             self.motors[i].update(msg.status[i])
 
     def __str__(self):
         return "".join([str(x) for x in self.motors])
+
+class ArmStatus(object):
+    def __init__(self, msg=None):
+        self.msg = msg 
+        self.motors: list[MotorStatus] = []
+        for i in range(14): self.motors.append(MotorStatus())
+        self.motors_pre: list[MotorStatus] = []
+        for i in range(14): self.motors_pre.append(MotorStatus())
+        self.update(msg)
     
+    def update(self, msg):
+        if msg is None: return 
+        for i in range(14):
+            self.motors_pre[i].update(self.motors[i])
+        for i in range(14):
+            self.motors[i].update(msg.status[i])
+
+    def __str__(self):
+        return "".join([str(x) for x in self.motors])
+
 
 class XarmHandler(object):
     def __init__(self):
@@ -286,7 +321,9 @@ class RobotNode(Node):
         SubscriptionNode(MotorStatusMsg, "/head/status", lambda x: self.head_status.update(x))
         SubscriptionNode(MotorStatusMsg, "/waist/status", lambda x: self.waist_status.update(x))
         SubscriptionNode(MotorStatusMsg, "/leg/status", lambda x: self.leg_status.update(x))
-
+        self.arm_status = ArmStatus()
+        SubscriptionNode(MotorStatusMsg, "/arm/status", lambda x: self.arm_status.update(x))
+        
         self.head_cmd_pos = self.create_publisher(
             CmdSetMotorPosition,
             "/head/cmd_pos", 10
@@ -310,6 +347,8 @@ class RobotNode(Node):
         self.play_file = self.create_client(PlayFile, "/audio_play/play_file")
         self.play_stop = self.create_client(PlayStop, "/audio_play/stop")
         self.arm = XarmHandler()
+
+        self.ec = 100
 
     def create_SetMotorPosition(self, name, pos, spd, cur):
         msg = SetMotorPosition()
@@ -441,3 +480,21 @@ class RobotNode(Node):
         time.sleep(delay)
         request = PlayStop.Request()
         self.play_stop.call_async(request)
+
+    def is_moving(self):
+        e = 0.0
+        for i in range(3):
+            e += (self.head_status.motors[i].pos - self.head_status.motors_pre[i].pos) ** 2
+        for i in range(2):
+            e += (self.waist_status.motors[i].pos - self.waist_status.motors_pre[i].pos) ** 2
+        for i in range(2):
+            e += (self.leg_status.motors[i].pos - self.leg_status.motors_pre[i].pos) ** 2
+        for i in range(14):
+            e += (self.arm_status.motors[i].pos - self.arm_status.motors_pre[i].pos) ** 2
+        print("error:", e)
+        if e > 0.0001:
+            self.ec = 0
+        else:
+            self.ec += 1
+        return self.ec > 10
+    
