@@ -106,10 +106,9 @@ if __name__ == "__main__":
             key_code = cv2.waitKey(1)
             
             if tx != -1:
-                tx = tx - 0.05
-                x = min(max(0.3, tx - 0.15), 0.8)
+                tx = tx - 0.075
+                x = min(max(0.3, tx - 0.15), 1.0)
                 rx = 20.0
-                y = 0.15 * np.sin(np.deg2rad(rx)) / 2 * 0
                 tz = tz - 0.05
                 # print(tx, ty, tz, y)
                 # print(x, ty, tz, y)
@@ -119,26 +118,26 @@ if __name__ == "__main__":
                     use_LR = "L"
                     node_robot.set_left_hand(1.0, 1.0, 0.0)
                     node_robot.arm.set_endpose_L((0.1, 0.4, tz), (0.0, -90, 0.0), deg=True, delay=5)
-                    node_robot.arm.set_endpose_L((x, max(0, ty - y), tz), (rx, -90, 0.0), deg=True, delay=5)
-                    node_robot.arm.set_endpose_L((tx, max(0, ty - y), tz), (rx, -90, 0.0), deg=True, delay=3)
-                    node_robot.set_left_hand(0.6, 0.5, 0.0, force=0.2)
+                    node_robot.arm.set_endpose_L((x, ty, tz), (rx, -90, 0.0), deg=True, delay=5)
+                    node_robot.arm.set_endpose_L((tx, ty, tz), (rx, -90, 0.0), deg=True, delay=2)
+                    node_robot.set_left_hand(0.6, 0.5, 0.0, force=0.2, delay=1)
                     node_robot.arm.set_endpose_L((0.1, 0.4, tz + 0.1), (0.0, -90, 0.0), deg=True, delay=5)
-                    node_robot.arm.set_endpose_L((0.1, 0.4, 0.0), (0.0, -90, 0.0), deg=True, delay=5)
+                    node_robot.arm.set_endpose_L((0.1, 0.4, 0.0), (0.0, -90, 0.0), deg=True, delay=3)
                 else:
                     node_robot.say("檢測到水瓶，現在用右手拿水瓶")
                     print("RIGHT HAND", ty)
                     use_LR = "R"
                     node_robot.set_right_hand(1.0, 1.0, 0.0)
                     node_robot.arm.set_endpose_R((0.0, -0.4, z), (0.0, -90, 0.0), deg=True, delay=5)
-                    node_robot.arm.set_endpose_R((x, ty + y, tz), (-rx, -90, 0.0), deg=True, delay=5)
-                    node_robot.arm.set_endpose_R((tx, ty + y, tz), (-rx, -90, 0.0), deg=True, delay=3)
-                    node_robot.set_right_hand(0.6, 0.5, 0.0, force=0.2)
+                    node_robot.arm.set_endpose_R((x, ty, tz), (-rx, -90, 0.0), deg=True, delay=5)
+                    node_robot.arm.set_endpose_R((tx, ty, tz), (-rx, -90, 0.0), deg=True, delay=2)
+                    node_robot.set_right_hand(0.6, 0.5, 0.0, force=0.2, delay=1)
                     node_robot.arm.set_endpose_R((0.1, -0.4, tz + 0.1), (0.0, -90, 0.0), deg=True, delay=5)
-                    node_robot.arm.set_endpose_R((0.1, -0.4, 0.0), (0.0, -90, 0.0), deg=True, delay=5)
+                    node_robot.arm.set_endpose_R((0.1, -0.4, 0.0), (0.0, -90, 0.0), deg=True, delay=3)
 
             if time.time() - state_t1 > 20:
                 node_robot.set_height(240, delay=1.0)
-                node_robot.set_arm_home_pose()
+                node_robot.set_arm_home_pose(delay=3.0)
 
                 p2 = node_slamtec.get_poi_by_name("P2")
                 action = node_slamtec.move_to(*p2)
@@ -158,19 +157,19 @@ if __name__ == "__main__":
             if use_LR == "L":
                 node_robot.arm.set_endpose_L((0.1, 0.4, 0.25), (0.0, -90, 0.0), deg=True, delay=5)
                 node_robot.arm.set_endpose_L((0.5, 0.2, 0.25), (0.0, -90, 0.0), deg=True, delay=5)
-                node_robot.set_left_hand(1.0, 1.0, 0.0)
+                node_robot.set_left_hand(1.0, 1.0, 0.0, delay=2)
                 node_robot.arm.set_endpose_L((0.1, 0.4, 0.25), (0.0, -90, 0.0), deg=True, delay=5)
-                node_robot.arm.set_endpose_L((0.1, 0.4, 0.0), (0.0, -90, 0.0), deg=True, delay=5)
+                node_robot.arm.set_endpose_L((0.1, 0.4, 0.0), (0.0, -90, 0.0), deg=True, delay=3)
             else:
                 node_robot.arm.set_endpose_R((0.1, -0.4, 0.25), (0.0, -90, 0.0), deg=True, delay=5)
                 node_robot.arm.set_endpose_R((0.5, -0.2, 0.25), (0.0, -90, 0.0), deg=True, delay=5)
-                node_robot.set_right_hand(1.0, 1.0, 0.0)
+                node_robot.set_right_hand(1.0, 1.0, 0.0, delay=2)
                 node_robot.arm.set_endpose_R((0.1, -0.4, 0.25), (0.0, -90, 0.0), deg=True, delay=5)
-                node_robot.arm.set_endpose_R((0.1, -0.4, 0.0), (0.0, -90, 0.0), deg=True, delay=5)
-            node_robot.set_arm_home_pose()
+                node_robot.arm.set_endpose_R((0.1, -0.4, 0.0), (0.0, -90, 0.0), deg=True, delay=3)
+            node_robot.set_arm_home_pose(delay=3.0)
 
             count += 1
-            if count >= 3:
+            if count >= 6:
                 node_robot.say("準備回家")
                 node_slamtec.move_to_home()
                 state, next_state = "go_home", "home"
