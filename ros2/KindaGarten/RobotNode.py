@@ -468,6 +468,7 @@ class RobotNode(Node):
         time.sleep(delay)
 
     def say(self, text, delay=1.0):
+        print(text)
         request = PlayText.Request()
         request.text = text
         self.play_text.call_async(request)
