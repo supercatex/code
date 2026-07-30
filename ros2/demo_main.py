@@ -22,8 +22,18 @@ if __name__ == "__main__":
     node_robot.say("重置機器人姿態")
     node_robot.arm.deactivate()
     node_robot.set_home_pose(delay=1.0)
-    node_robot.set_height(150, delay=0.0)
-    node_robot.set_head_pos((0.0, -20.0, 0.0), deg=True)
+
+    node_robot.say("檢查靈巧手")
+    node_robot.check_left_hand(delay=0.0)
+    node_robot.check_right_hand(delay=5.0)
+    # node_robot.set_left_hand(1.0, 1.0, 1.0)
+    # node_robot.set_left_hand(1.0, 1.0, 0.0)
+
+    # node_robot.arm.set_endpose_L((0.0, 0.4, 0.0), (0.0, -90, 0.0), deg=True, delay=5)
+    # node_robot.arm.set_endpose_L((0.5, 0.25, 0.0), (30.0, -90, 0.0), deg=True, delay=5)
+
+    # node_robot.set_left_hand(0.6, 0.3, 0.0)
+    # node_robot.arm.set_endpose_L((0.0, 0.4, 0.1), (0.0, -90, 0.0), deg=True, delay=5)
 
     node_robot.say("正在截入地圖並設置初始點")
     node_slamtec.set_stcm_map("/home/ubuntu/workspace/map_002.stcm")
@@ -32,6 +42,9 @@ if __name__ == "__main__":
     state, next_state = "ready", ""
     state_t1 = time.time()
     action = None 
+    first = True
+    use_LR = ""
+    count = 0
 
     fps = 15
     while rclpy.ok():
@@ -43,13 +56,12 @@ if __name__ == "__main__":
         yolo_data = node_yolo.yolo_data.copy()
 
         if state == "ready":
-            node_robot.say("我準備好了！準備出發去目的地！")
+            node_robot.say("我準備好了！出發！")
             p1 = node_slamtec.get_poi_by_name("P1")
             action = node_slamtec.move_to(*p1)
             state, next_state = "move_to", "detect_bottle"
         elif state == "move_to":
             status = node_slamtec.get_action_status(action["action_id"])
-            # print("\r", status, end="")
             if status["state"]["status"] == 4:
                 node_robot.play("/home/nvidia/data/speech/builtin/anjianyin.mp3", delay=1)
                 node_robot.say("到達目的地")
@@ -57,7 +69,6 @@ if __name__ == "__main__":
                 state_t1 = time.time()
         elif state == "go_home":
             status = node_slamtec.get_power_status()
-            # print("\r", status, end="")
             if status["dockingStatus"] == "on_dock":
                 node_robot.play("/home/nvidia/data/speech/builtin/anjianyin.mp3", delay=1)
                 node_robot.say("正在充電中")
@@ -68,7 +79,14 @@ if __name__ == "__main__":
                 state = next_state
                 state_t1 = time.time()
         elif state == "detect_bottle":
-            time.sleep(1)
+            if first:
+                node_robot.set_height(150, delay=0.0)
+                node_robot.set_head_pos((0.0, -20.0, 0.0), deg=True, delay=1.0)
+                state, next_state = "refresh_camera", "detect_bottle"
+                state_t1 = time.time()
+                first = False
+                continue
+
             tx, ty, tz = -1, -1, -1
             for obj in yolo_data["obj"]:
                 if obj["cls"] != 39: continue
@@ -79,37 +97,92 @@ if __name__ == "__main__":
                 cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 cv2.circle(image, (cx, cy), 5, (0, 255, 0), -1)
                 cv2.putText(image, f"{x:.2f}, {y:.2f}, {z:.2f}", (cx, cy), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-                print(x, y, z, obj["depth"])
+                # print(x, y, z, obj["depth"])
                 if x == 0: continue 
                 if tx == -1 or x < tx:
                     tx, ty, tz = x, y, z 
-
+            print(tx, ty, tz)
+            cv2.imshow("frame", node_yolo.get_display_image(image, depth))
+            key_code = cv2.waitKey(1)
+            
             if tx != -1:
-                x = min(max(0.3, tx - 0.2), 0.8)
-                print(tx, ty, tz)
-                print(x, ty, tz)
-                if y > 0:
-                    node_robot.arm.set_endpose_L((0.0, 0.4, tz), (0.0, -90, 0.0), deg=True, delay=5)
-                    node_robot.arm.set_endpose_L((x, ty, tz), (0.0, -90, 0.0), deg=True, delay=5)
-                    node_robot.arm.set_endpose_L((0.0, 0.4, tz), (0.0, -90, 0.0), deg=True, delay=5)
+                tx = tx - 0.05
+                x = min(max(0.3, tx - 0.15), 0.8)
+                rx = 20.0
+                y = 0.15 * np.sin(np.deg2rad(rx)) / 2 * 0
+                tz = tz - 0.05
+                # print(tx, ty, tz, y)
+                # print(x, ty, tz, y)
+                if ty > 0:
+                    node_robot.say("檢測到水瓶，現在用左手拿水瓶")
+                    print("LEFT HAND", ty)
+                    use_LR = "L"
+                    node_robot.set_left_hand(1.0, 1.0, 0.0)
+                    node_robot.arm.set_endpose_L((0.1, 0.4, tz), (0.0, -90, 0.0), deg=True, delay=5)
+                    node_robot.arm.set_endpose_L((x, max(0, ty - y), tz), (rx, -90, 0.0), deg=True, delay=5)
+                    node_robot.arm.set_endpose_L((tx, max(0, ty - y), tz), (rx, -90, 0.0), deg=True, delay=3)
+                    node_robot.set_left_hand(0.6, 0.5, 0.0, force=0.2)
+                    node_robot.arm.set_endpose_L((0.1, 0.4, tz + 0.1), (0.0, -90, 0.0), deg=True, delay=5)
+                    node_robot.arm.set_endpose_L((0.1, 0.4, 0.0), (0.0, -90, 0.0), deg=True, delay=5)
                 else:
+                    node_robot.say("檢測到水瓶，現在用右手拿水瓶")
+                    print("RIGHT HAND", ty)
+                    use_LR = "R"
+                    node_robot.set_right_hand(1.0, 1.0, 0.0)
                     node_robot.arm.set_endpose_R((0.0, -0.4, z), (0.0, -90, 0.0), deg=True, delay=5)
-                    node_robot.arm.set_endpose_R((x, ty, tz), (0.0, -90, 0.0), deg=True, delay=5)
-                    node_robot.arm.set_endpose_R((0.0, -0.4, tz), (0.0, -90, 0.0), deg=True, delay=5)
+                    node_robot.arm.set_endpose_R((x, ty + y, tz), (-rx, -90, 0.0), deg=True, delay=5)
+                    node_robot.arm.set_endpose_R((tx, ty + y, tz), (-rx, -90, 0.0), deg=True, delay=3)
+                    node_robot.set_right_hand(0.6, 0.5, 0.0, force=0.2)
+                    node_robot.arm.set_endpose_R((0.1, -0.4, tz + 0.1), (0.0, -90, 0.0), deg=True, delay=5)
+                    node_robot.arm.set_endpose_R((0.1, -0.4, 0.0), (0.0, -90, 0.0), deg=True, delay=5)
 
-            if time.time() - state_t1 > 60:
-                node_robot.set_home_pose()
-                node_robot.set_height(150, delay=0.0)
-                node_robot.set_head_pos((0.0, -20.0, 0.0), deg=True)
-                
-                node_robot.say("回家了")
-                node_slamtec.move_to_home()
-                state, next_state = "go_home", "home"
+            if time.time() - state_t1 > 20:
+                node_robot.set_height(240, delay=1.0)
+                node_robot.set_arm_home_pose()
+
+                p2 = node_slamtec.get_poi_by_name("P2")
+                action = node_slamtec.move_to(*p2)
+                state, next_state = "move_to", "put_bottle"
+                node_robot.say("出發！")
+
+                # node_robot.say("回家了")
+                # node_slamtec.move_to_home()
+                # state, next_state = "go_home", "home"
             else:
+                pass
                 node_robot.say("再來一次")
                 state, next_state = "refresh_camera", "detect_bottle"
                 state_t1 = time.time()
+        elif state == "put_bottle":
+            node_robot.say("現在放置水瓶")
+            if use_LR == "L":
+                node_robot.arm.set_endpose_L((0.1, 0.4, 0.25), (0.0, -90, 0.0), deg=True, delay=5)
+                node_robot.arm.set_endpose_L((0.5, 0.2, 0.25), (0.0, -90, 0.0), deg=True, delay=5)
+                node_robot.set_left_hand(1.0, 1.0, 0.0)
+                node_robot.arm.set_endpose_L((0.1, 0.4, 0.25), (0.0, -90, 0.0), deg=True, delay=5)
+                node_robot.arm.set_endpose_L((0.1, 0.4, 0.0), (0.0, -90, 0.0), deg=True, delay=5)
+            else:
+                node_robot.arm.set_endpose_R((0.1, -0.4, 0.25), (0.0, -90, 0.0), deg=True, delay=5)
+                node_robot.arm.set_endpose_R((0.5, -0.2, 0.25), (0.0, -90, 0.0), deg=True, delay=5)
+                node_robot.set_right_hand(1.0, 1.0, 0.0)
+                node_robot.arm.set_endpose_R((0.1, -0.4, 0.25), (0.0, -90, 0.0), deg=True, delay=5)
+                node_robot.arm.set_endpose_R((0.1, -0.4, 0.0), (0.0, -90, 0.0), deg=True, delay=5)
+            node_robot.set_arm_home_pose()
+
+            count += 1
+            if count >= 3:
+                node_robot.say("準備回家")
+                node_slamtec.move_to_home()
+                state, next_state = "go_home", "home"
+            else:
+                node_robot.say("再去拿下一個水瓶")
+                state, next_state = "ready", ""
+                first = True 
+
         elif state == "home":
+            node_robot.set_home_pose(delay=0.0)
+            node_robot.set_height(150, delay=0.0)
+            node_robot.set_head_pos((0.0, -20.0, 0.0), deg=True)
             node_robot.say("任務完成")
             break
 
