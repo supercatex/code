@@ -416,12 +416,12 @@ class RobotNode(Node):
         pos_R = [0.64, 0.15, 0.0, -1.31, 0.0, -0.48, 0.35]
         self.arm.set_arm_joints(pos_L, pos_R, delay)
 
-    def set_home_pose(self, delay=5.0):
-        self.set_head_pos((0.0, 0.0, 0.0), delay=0.0)
-        self.set_left_hand(1.0, 1.0, 1.0, delay=0.0)
-        self.set_right_hand(1.0, 1.0, 1.0, delay=0.0)
-        self.set_height(240, delay=0.0)
-        self.set_arm_home_pose(delay=delay)
+    def set_home_pose(self, head=True, body=True, arm=True, hand=True, delay=5.0):
+        if head: self.set_head_pos((0.0, 0.0, 0.0), delay=0.0)
+        if hand: self.set_left_hand(1.0, 1.0, 1.0, delay=0.0)
+        if hand: self.set_right_hand(1.0, 1.0, 1.0, delay=0.0)
+        if body: self.set_height(240, delay=0.0)
+        if arm: self.set_arm_home_pose(delay=delay)
     
     def set_left_hand(self, angle1, angle2, angle3, force=0.1, delay=3.0):
         request = SetForce.Request()
@@ -467,16 +467,17 @@ class RobotNode(Node):
         self.set_gesture_force_calibration_R.call_async(request)
         time.sleep(delay)
 
-    def say(self, text, delay=1.0):
-        print(text)
+    def say(self, text, delay=3.0):
+        self.get_logger().info(text)
         request = PlayText.Request()
         request.text = text
         self.play_text.call_async(request)
         time.sleep(delay)
 
-    def play(self, filepath, delay=5.0):
+    def play(self, audio_path, delay=5.0):
+        self.get_logger().info(audio_path)
         request = PlayFile.Request()
-        request.path = filepath 
+        request.path = audio_path 
         self.play_file.call_async(request)
         time.sleep(delay)
         request = PlayStop.Request()
