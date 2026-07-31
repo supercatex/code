@@ -64,7 +64,31 @@ class SlamtecNode(object):
     def get_current_action(self):
         return self.send_request("/api/core/motion/v1/actions/:current")
     
-    def move_to(self, x, y, yaw=0.0):
+    def move_to(self, x, y, yaw=None, mode=2, precise=False, fail_retry_count=None, find_path_ignoring_dynamic_obstacles=False, with_directed_virtual_track=False):
+        '''
+        mode:
+            0: 自由導航
+            1: 嚴格軌道
+            2: 軌道優先
+        yaw == None 時，到目的地時隨意朝向
+        precise: 精確到點模式
+        fail_retry_count: 搜路失敗後重試次數
+        find_path_ignoring_dynamic_obstacles: 搜路時忽略動態障礙物
+        with_directed_virtual_track: 當 mode 1/2 時，按軌道方向移動
+        '''
+        flags = []
+        if yaw is None:
+            yaw = 0
+        else: 
+            flags.append("with_yaw")
+        if precise: flags.append("precise")
+        if fail_retry_count is None:
+            fail_retry_count = 0
+        else:
+            flags.append("fail_retry_count")
+        if find_path_ignoring_dynamic_obstacles: flags.append("find_path_ignoring_dynamic_obstacles")
+        if with_directed_virtual_track: flags.append("with_directed_virtual_track")
+
         return self.send_request("/api/core/motion/v1/actions", "POST", {
             "action_name": "slamtec.agent.actions.MoveToAction",
             "options": {
@@ -74,11 +98,11 @@ class SlamtecNode(object):
                     "z": 0
                 },
                 "move_options": {
-                    "mode": 2,
-                    "flags": ["with_yaw"],
+                    "mode": mode,
+                    "flags": flags,
                     "yaw": yaw,
                     "acceptable_precision": 0,
-                    "fail_retry_count": 0,
+                    "fail_retry_count": fail_retry_count,
                     "speed_ratio": 0
                 }
             }
