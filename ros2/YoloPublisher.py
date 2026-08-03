@@ -7,9 +7,9 @@ import cv2
 import numpy as np 
 import time 
 from ultralytics import YOLO
-import base64
 import json 
 import copy
+import os 
 
 
 class YoloPublisher(Node):
@@ -41,7 +41,13 @@ class YoloPublisher(Node):
             "/ob_camera_head/yolo/depth", 10
         )
 
-        self.yolo = YOLO("yolo26x-seg.pt")
+        self.models = {}
+        self.yolo_dir = "/data/yolo/"
+        for name in os.listdir(self.yolo_dir):
+            if name[-3:] != ".pt": continue
+            path = os.path.join(self.yolo_dir, name)
+            self.models[name] = YOLO(path)
+
 
     def callback_image(self, msg): self.msg_image = msg
     def callback_depth(self, msg): self.msg_depth = msg
@@ -66,33 +72,36 @@ if __name__ == "__main__":
         image = np.array(image, dtype=np.uint8)
         depth = np.array(depth, dtype=np.int32)
 
-        res = node.yolo.predict(image, device="0", conf=0.1, verbose=False)[0]
-        
         data = {}
-        data["obj"] = []
-        if res.masks is not None:
-            for c, xyxy, conf, xy in zip(res.boxes.cls, res.boxes.xyxy, res.boxes.conf, res.masks.xy):
-                x1, y1, x2, y2 = map(int, xyxy)
-                cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
-                cz = depth[cy][cx]
-                data["obj"].append({
-                    "cls": int(c),
-                    "xyxy": [x1, y1, x2, y2],
-                    "conf": float(conf),
-                    "depth": int(cz),
-                    "xy": xy.tolist()
-                })
-        else:
-            for c, xyxy, conf in zip(res.boxes.cls, res.boxes.xyxy, res.boxes.conf):
-                x1, y1, x2, y2 = map(int, xyxy)
-                cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
-                cz = depth[cy][cx]
-                data["obj"].append({
-                    "cls": int(c),
-                    "xyxy": [x1, y1, x2, y2],
-                    "conf": float(conf),
-                    "depth": int(cz)
-                })
+        for name, model in node.models.items():
+            data[name] = []
+            res = model.predict(image, device="0", conf=0.1, verbose=False)[0]
+
+            if res.masks is not None:
+                for c, xyxy, conf, xy in zip(res.boxes.cls, res.boxes.xyxy, res.boxes.conf, res.masks.xy):
+                    x1, y1, x2, y2 = map(int, xyxy)
+                    cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+                    cz = depth[cy][cx]
+                    data[name].append({
+                        "cls": int(c),
+                        "xyxy": [x1, y1, x2, y2],
+                        "conf": float(conf),
+                        "depth": int(cz),
+                        "xy": xy.tolist()
+                    })
+            else:
+                for c, xyxy, conf in zip(res.boxes.cls, res.boxes.xyxy, res.boxes.conf):
+                    x1, y1, x2, y2 = map(int, xyxy)
+                    cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+                    cz = depth[cy][cx]
+                    data[name].append({
+                        "cls": int(c),
+                        "xyxy": [x1, y1, x2, y2],
+                        "conf": float(conf),
+                        "depth": int(cz)
+                    })
+
+            print(name, len(res))
 
         json_string = json.dumps(data)
         msg = String()
