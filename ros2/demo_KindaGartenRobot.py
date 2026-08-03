@@ -1,4 +1,3 @@
-from KindaGarten.basic import *
 from KindaGarten import *
 from KindaGartenRobot import KindaGartenRobot
 
@@ -32,9 +31,9 @@ if __name__ == "__main__":
     # 刷新影像
         elif robot.state == "state_2":
             robot.say("到達P1")
-            robot.say("調整高度和鏡頭角度")
-            robot.set_head_pos((0, -20, 0), deg=True, delay=0)
-            robot.set_height(150, delay=0)
+            # robot.say("調整高度和鏡頭角度")
+            # robot.set_head_pos((0, -20, 0), deg=True, delay=0)
+            # robot.set_height(150, delay=0)
             robot.say("刷新影像")
             robot.refresh_camera(5, "state_3")
     # 抓取水瓶
@@ -45,7 +44,7 @@ if __name__ == "__main__":
                 if obj["conf"] < 0.5: continue
                 x1, y1, x2, y2 = obj["xyxy"]
                 cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
-                x, y, z = get_real_xyz(cx, cy, depth)
+                x, y, z = get_real_xyz_v2(cx, cy, depth, robot.head_rpy, 3)
                 cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 cv2.circle(image, (cx, cy), 5, (0, 255, 0), -1)
                 cv2.putText(image, f"{x:.2f}, {y:.2f}, {z:.2f}", (cx, cy), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
