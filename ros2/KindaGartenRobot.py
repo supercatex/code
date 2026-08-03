@@ -104,6 +104,7 @@ class KindaGartenRobot(object):
         duration, audio_path = self.BUILTIN_AUDIO[audio_id]
         if delay is not None: duration = delay
         self.play(audio_path, duration)
+        time.sleep(0.1)
 
     def say(self, text, delay=3.0):
         self.node_robot.say(text, delay)
@@ -140,10 +141,10 @@ class KindaGartenRobot(object):
 
     def pick_up_L(self, pos, force=0.2):
         x, y, z = pos 
-        x = x - 0.075
-        xx = min(max(0.3, x - 0.15), 1.0)
         rx = 20.0
-        z = z - 0.05
+        x = x - 0.1 * np.cos(np.deg2rad(rx))
+        x = min(max(0.3, x), 1.0)
+        xx = x - 0.1
         if y < 0:
             self.node_robot.get_logger().warn(f"{x}, {y}, {z} cannot use left hand.")
             return False
