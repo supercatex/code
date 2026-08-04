@@ -200,21 +200,22 @@ class XarmHandler(object):
         self.deactivate()
         self.topic_publisher = TopicPublisher(self.xarm)
 
+        value = 0.0005
         param_configer = ParamConfiger(self.xarm)
         param_configer.set_node_parameter("endpose_single_arm_qp_L_controller", "dis_err_bound", 10.0)
         param_configer.set_node_parameter("endpose_single_arm_qp_L_controller", "ori_err_bound", 3.0)
-        param_configer.set_node_parameter("endpose_single_arm_qp_L_controller", "otg_p_step", 0.0005)
-        param_configer.set_node_parameter("endpose_single_arm_qp_L_controller", "otg_r_step", 0.0005)
+        param_configer.set_node_parameter("endpose_single_arm_qp_L_controller", "otg_p_step", value)
+        param_configer.set_node_parameter("endpose_single_arm_qp_L_controller", "otg_r_step", value)
 
         param_configer.set_node_parameter("endpose_single_arm_qp_R_controller", "dis_err_bound", 10.0)
         param_configer.set_node_parameter("endpose_single_arm_qp_R_controller", "ori_err_bound", 3.0)
-        param_configer.set_node_parameter("endpose_single_arm_qp_R_controller", "otg_p_step", 0.0005)
-        param_configer.set_node_parameter("endpose_single_arm_qp_R_controller", "otg_r_step", 0.0005)
+        param_configer.set_node_parameter("endpose_single_arm_qp_R_controller", "otg_p_step", value)
+        param_configer.set_node_parameter("endpose_single_arm_qp_R_controller", "otg_r_step", value)
 
         param_configer.set_node_parameter("endpose_dual_arm_qp_controller", "dis_err_bound", 10.0)
         param_configer.set_node_parameter("endpose_dual_arm_qp_controller", "ori_err_bound", 3.0)
-        param_configer.set_node_parameter("endpose_dual_arm_qp_controller", "otg_p_step", 0.0005)
-        param_configer.set_node_parameter("endpose_dual_arm_qp_controller", "otg_r_step", 0.0005)
+        param_configer.set_node_parameter("endpose_dual_arm_qp_controller", "otg_p_step", value)
+        param_configer.set_node_parameter("endpose_dual_arm_qp_controller", "otg_r_step", value)
 
         self.xarm.hardware_arm_enable(True)
 
