@@ -14,7 +14,7 @@ class YoloSubscriber(Node):
         )
         self.sub_depth = SubscriptionNode(
             Image, topic_depth,
-            lambda x: CvBridge().imgmsg_to_cv2(x)
+            lambda x: CvBridge().imgmsg_to_cv2(x, "passthrough")
         )
         self.sub_yolo = SubscriptionNode(
             String, topic_yolo,
@@ -28,11 +28,11 @@ class YoloSubscriber(Node):
         return True 
 
     @property
-    def image(self):
+    def image(self) -> np.ndarray[(any, any, 3), np.uint8]:
         return self.sub_image.data
 
     @property
-    def depth(self):
+    def depth(self) -> np.ndarray[(any, any), np.int32]:
         return self.sub_depth.data 
 
     @property
@@ -46,6 +46,15 @@ class YoloSubscriber(Node):
         cv2.drawContours(b_mask, [contour], -1, (255, 255, 255), cv2.FILLED)
         return b_mask
 
+    def draw_boxes(self, image, yolo_data):
+        for obj in yolo_data["obj"]:
+            x1, y1, x2, y2 = obj["xyxy"]
+            cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+            if "xy" in obj:
+                image = self.draw_mask_by_xy(image, obj["xy"])
+        return image
+
     def draw_mask_by_mask(self, image, b_mask):
         color3ch = np.zeros(image.shape, dtype=np.uint8)
         color3ch[:, :, 1] = 255
@@ -58,9 +67,9 @@ class YoloSubscriber(Node):
         b_mask = self.get_binary_mask_by_xy(xy)
         return self.draw_mask_by_mask(image, b_mask)
 
-    def get_display_image(self, image, depth):
+    def get_display_image(self, image, depth, scale=0.5):
         h, w, c = image.shape
-        h, w = h // 2, w // 2
+        h, w = int(h * scale), int(w * scale)
         heatmap = np.array(depth / np.max(depth) * 255, dtype=np.uint8)
         heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
         heatmap = cv2.resize(heatmap, (w, h))
