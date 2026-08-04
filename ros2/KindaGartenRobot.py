@@ -1,5 +1,6 @@
 from KindaGarten.basic import *
 from KindaGarten import *
+import numpy as np
 
 
 class KindaGartenRobot(object):
@@ -8,7 +9,7 @@ class KindaGartenRobot(object):
     SUPPORT_STATE_MOVE_TO_POINT = 2
     SUPPORT_STATE_REFRESH_CAMERA = 3
 
-    def __init__(self,):
+    def __init__(self, wait_for_image=True):
         self.node_slamtec = SlamtecNode(ip="192.168.11.1", port=1448)
         self.node_ollama = OllamaNode(host="192.168.41.2:11434")
         self.node_robot = RobotNode()
@@ -26,12 +27,13 @@ class KindaGartenRobot(object):
         self.support_state = self.SUPPORT_STATE_NONE
         self.support_data = {}
 
-        self.play_default()
-        while not self.node_yolo.ok():
-            self.update()
-            time.sleep(1)
-            self.play_default(7)
-        self.play_default()
+        if wait_for_image:
+            self.play_default()
+            while not self.node_yolo.ok():
+                self.update()
+                time.sleep(1)
+                self.play_default(7)
+            self.play_default()
 
     def update(self):
         time.sleep(max(0.0, min(1/self.fps - (time.time() - self.update_time), 1/self.fps)))
@@ -60,12 +62,14 @@ class KindaGartenRobot(object):
         self.prev_state = self.state 
         self.state = state 
 
-    def display_image(self, image, depth):
-        return self.node_yolo.get_display_image(image, depth)
+    def display_image(self, image=None, depth=None, scale=0.5):
+        if image is None: image = self.image 
+        if depth is None: depth = self.depth
+        return self.node_yolo.get_display_image(image, depth, scale)
     
 # region property
     @property
-    def image(self):
+    def image(self) -> np.ndarray[(any, any, 3), np.uint8]:
         return self.node_yolo.image
 
     @property
@@ -74,7 +78,7 @@ class KindaGartenRobot(object):
 
     @property
     def yolo_data(self):
-        return self.node_yolo.yolo_data["obj"]
+        return self.node_yolo.yolo_data
 
     @property
     def head_rpy(self):
@@ -82,7 +86,7 @@ class KindaGartenRobot(object):
 
     @property
     def height(self):
-        return self.node_robot.get_height()
+        return self.node_robot.get_height() / 1000
 # endregion property
 
 # region​ AUDIO
@@ -103,18 +107,29 @@ class KindaGartenRobot(object):
     def play_default(self, audio_id=0, delay=None):
         duration, audio_path = self.BUILTIN_AUDIO[audio_id]
         if delay is not None: duration = delay
-        self.play(audio_path, duration)
-        time.sleep(0.1)
+        self.play(audio_path, duration + 0.5)
 
     def say(self, text, delay=3.0):
         self.node_robot.say(text, delay)
+
+    def send_message(self, text, img=None, img_path=None):
+        return self.node_ollama.send_message(text, img, img_path)
 # endregion AUDIO
 
 # region ROBOT
     def set_home_pose(self, head=True, body=True, arm=True, hand=True, delay=3.0):
         self.node_robot.set_home_pose(head, body, arm, hand, delay)
 
-    def refresh_camera(self, delay, next_state):
+    def refresh_camera_loop(self, delay):
+        t1 = time.time()
+        while rclpy.ok():
+            self.update()
+            cv2.imshow("frame", self.display_image(self.image, self.depth))
+            cv2.waitKey(1)
+            if time.time() - t1 > delay:
+                break
+
+    def refresh_camera_state(self, delay, next_state):
         self.state = ""
         self.next_state = next_state
         self.support_state = self.SUPPORT_STATE_REFRESH_CAMERA
@@ -125,7 +140,7 @@ class KindaGartenRobot(object):
         self.node_robot.set_head_pos(pos, deg=deg, delay=delay)
 
     def set_height(self, value, delay=3.0):
-        self.node_robot.set_height(value)
+        self.node_robot.set_height(value * 1000)
 
     def set_hand_L(self, pos_1, pos_2, pos_3, force=0.1, delay=1.0):
         self.node_robot.set_left_hand(pos_1, pos_2, pos_3, force, delay)
@@ -133,48 +148,70 @@ class KindaGartenRobot(object):
     def set_hand_R(self, pos_1, pos_2, pos_3, force=0.1, delay=1.0):
         self.node_robot.set_right_hand(pos_1, pos_2, pos_3, force, delay)
 
+    def check_hand(self, delay=12.0):
+        self.node_robot.check_left_hand(delay=0)
+        self.node_robot.check_right_hand(delay=delay)
+
     def set_endpose_L(self, pos, rpy, deg=False, delay=5.0):
         self.node_robot.arm.set_endpose_L(pos, rpy, deg=deg, delay=delay)
 
     def set_endpose_R(self, pos, rpy, deg=False, delay=5.0):
         self.node_robot.arm.set_endpose_R(pos, rpy, deg=deg, delay=delay)
 
-    def pick_up_L(self, pos, force=0.2):
+    def pick_up_L_TD(self, pos, force=0.2):
+        print(pos)
+        x, y, z = pos 
+        x = min(max(0.3, x - 0.175), 1.0)
+        if y < 0:
+            self.node_robot.get_logger().warn(f"{x}, {y}, {z} cannot use left hand.")
+            return False
+
+        self.set_hand_L(0.6, 0.5, 0.0, force=force, delay=1)
+        self.set_endpose_L((0.1, 0.4, z + 0.15), (90, 0, -90), deg=True, delay=10)
+        self.set_endpose_L((x, y, z + 0.15), (90, 0, -90), deg=True, delay=5)
+        self.set_hand_L(1.0, 1.0, 0.0, delay=1)
+        self.set_endpose_L((x, y, z + 0.05), (90, 0, -90), deg=True, delay=2)
+        self.set_hand_L(0.6, 0.5, 0.0, force=force, delay=1)
+        self.set_endpose_L((0.1, 0.4, z + 0.15), (90, 0, -90), deg=True, delay=5)
+        self.set_endpose_L((0.1, 0.4, 0.0), (90, 0, -90), deg=True, delay=5)
+        return True
+
+    def pick_up_L(self, pos, force=0.1):
+        print(pos)
         x, y, z = pos 
         rx = 20.0
         x = x - 0.1 * np.cos(np.deg2rad(rx))
         x = min(max(0.3, x), 1.0)
-        xx = x - 0.1
         if y < 0:
             self.node_robot.get_logger().warn(f"{x}, {y}, {z} cannot use left hand.")
             return False
         
         self.set_endpose_L((0.1, 0.4, z), (0.0, -90, 0.0), deg=True, delay=5)
         self.set_hand_L(1.0, 1.0, 0.0, delay=0)
-        self.set_endpose_L((xx, y, z), (rx, -90, 0.0), deg=True, delay=5)
-        self.set_endpose_L((x, y, z), (rx, -90, 0.0), deg=True, delay=2)
-        self.set_hand_L(0.6, 0.5, 0.0, force=force, delay=1)
-        self.set_endpose_L((0.1, 0.4, z + 0.1), (0.0, -90, 0.0), deg=True, delay=5)
-        self.set_endpose_L((0.1, 0.4, 0.0), (0.0, -90, 0.0), deg=True, delay=3)
+        self.set_endpose_L((0.3, y, z), (rx, -90, 0.0), deg=True, delay=5)
+        self.set_endpose_L((x, y, z), (rx, -90, 0.0), deg=True, delay=5)
+        self.set_hand_L(0.5, 0.3, 0.0, force=force, delay=1)
+        self.set_endpose_L((0.3, y, z + 0.1), (0.0, -90, 0.0), deg=True, delay=5)
+        self.set_endpose_L((0.1, 0.4, 0.0), (0.0, -90, 0.0), deg=True, delay=5)
         return True
 
-    def pick_up_R(self, pos, force=0.2):
-        x, y, z = pos 
-        x = x - 0.075
-        xx = min(max(0.3, x - 0.15), 1.0)
+    def pick_up_R(self, pos, force=0.1):
+        print(pos)
+        x, y, z = pos
         rx = 20.0
-        z = z - 0.05
+        x = x - 0.1 * np.cos(np.deg2rad(rx))
+        x = min(max(0.3, x), 1.0)
         if y > 0:
             self.node_robot.get_logger().warn(f"{x}, {y}, {z} cannot use right hand.")
             return False
         
         self.set_endpose_R((0.0, -0.4, z), (0.0, -90, 0.0), deg=True, delay=5)
         self.set_hand_R(1.0, 1.0, 0.0, delay=0)
-        self.set_endpose_R((xx, y, z), (-rx, -90, 0.0), deg=True, delay=5)
-        self.set_endpose_R((x, y, z), (-rx, -90, 0.0), deg=True, delay=2)
-        self.set_hand_R(0.6, 0.5, 0.0, force=0.2, delay=1)
-        self.set_endpose_R((0.1, -0.4, z + 0.1), (0.0, -90, 0.0), deg=True, delay=5)
-        self.set_endpose_R((0.1, -0.4, 0.0), (0.0, -90, 0.0), deg=True, delay=3)
+        self.set_endpose_R((0.3, y, z), (-rx, -90, 0.0), deg=True, delay=5)
+        self.set_endpose_R((x, y, z), (-rx, -90, 0.0), deg=True, delay=5)
+        self.set_hand_R(0.5, 0.3, 0.0, force=force, delay=1)
+        self.set_endpose_R((0.3, y, z + 0.1), (0.0, -90, 0.0), deg=True, delay=5)
+        self.set_endpose_R((0.1, -0.4, 0.0), (0.0, -90, 0.0), deg=True, delay=5)
         return True
 
     def put_down_L(self, pos):
@@ -232,7 +269,20 @@ class KindaGartenRobot(object):
         self.next_state = next_state
         self.support_state = self.SUPPORT_STATE_MOVE_TO_HOME
         return self.node_slamtec.move_to_home()
+
+    def get_location(self):
+        data = self.node_slamtec.get_localization_pose()
+        return data["x"], data["y"], data["yaw"]
+
+    def move_by_distance(self, dx, dy, dyaw, next_state, deg=False, mode=0):
+        if deg: dyaw = np.deg2rad(dyaw)
+        ox, oy, oyaw = self.get_location()
+        new_x = ox + dx * np.cos(oyaw) + dy * np.cos(oyaw + np.pi / 2)
+        new_y = oy + dx * np.sin(oyaw) + dy * np.sin(oyaw + np.pi / 2)
+        # print(new_x, new_y, oyaw + dyaw)
+        self.move_to_point(new_x, new_y, oyaw + dyaw, next_state, mode=0)
 # endregion SLAMTEC
+
 
 def main():
     robot = KindaGartenRobot()
